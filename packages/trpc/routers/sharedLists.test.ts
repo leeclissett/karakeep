@@ -2925,4 +2925,42 @@ describe("Shared Lists", () => {
       });
     });
   });
+
+  describe("Pinned lists", () => {
+    test<CustomTestContext>("collaborators cannot pin a list and see pinned as false", async ({
+      apiCallers,
+    }) => {
+      const ownerApi = apiCallers[0];
+      const collaboratorApi = apiCallers[1];
+
+      const list = await ownerApi.lists.create({
+        name: "Pinned Shared List",
+        icon: "📌",
+        type: "manual",
+        pinned: true,
+      });
+
+      await addAndAcceptCollaborator(
+        ownerApi,
+        collaboratorApi,
+        list.id,
+        "editor",
+      );
+
+      const ownerView = await ownerApi.lists.get({ listId: list.id });
+      expect(ownerView.pinned).toBe(true);
+
+      const collabView = await collaboratorApi.lists.get({ listId: list.id });
+      expect(collabView.pinned).toBe(false);
+
+      const collabLists = await collaboratorApi.lists.list();
+      expect(collabLists.lists.find((l) => l.id === list.id)?.pinned).toBe(
+        false,
+      );
+
+      await expect(
+        collaboratorApi.lists.edit({ listId: list.id, pinned: true }),
+      ).rejects.toThrow(/not allowed to manage this list/);
+    });
+  });
 });

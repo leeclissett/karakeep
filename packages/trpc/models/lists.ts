@@ -67,6 +67,8 @@ export abstract class List {
       parentId: null,
       // Hide whether the list is public or not.
       public: false,
+      // Pinning is an owner-only preference.
+      pinned: false,
     };
   }
 
@@ -266,6 +268,7 @@ export abstract class List {
         parentId: input.parentId,
         type: input.type,
         query: input.query,
+        pinned: input.pinned ?? false,
       })
       .returning();
     return this.fromData(
@@ -644,6 +647,7 @@ export abstract class List {
         parentId: input.parentId,
         query: input.query,
         public: input.public,
+        pinned: input.pinned,
       })
       .where(
         and(

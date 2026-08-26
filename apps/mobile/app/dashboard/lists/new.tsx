@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, Switch, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { ListParentField } from "@/components/lists/list-parent-field";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +26,7 @@ const NewListPage = () => {
   const [listType, setListType] = useState<ListType>("manual");
   const [query, setQuery] = useState("");
   const [parentId, setParentId] = useState<string | null>(null);
+  const [pinned, setPinned] = useState(false);
 
   React.useEffect(() => {
     if (typeof selectedParentId !== "string") return;
@@ -70,6 +71,7 @@ const NewListPage = () => {
       type: listType,
       query: listType === "smart" ? query : undefined,
       parentId,
+      pinned,
     });
   };
 
@@ -143,6 +145,16 @@ const NewListPage = () => {
           </Text>
         </View>
       )}
+
+      <View className="flex flex-row items-center justify-between rounded-xl bg-card px-4 py-3">
+        <View className="mr-4 flex-1 gap-1">
+          <Text className="text-sm text-muted-foreground">Pin list</Text>
+          <Text className="text-xs text-muted-foreground">
+            Show this list at the top of the lists tab
+          </Text>
+        </View>
+        <Switch value={pinned} onValueChange={setPinned} />
+      </View>
 
       <Button disabled={isPending} onPress={onSubmit}>
         <Text>Save</Text>
