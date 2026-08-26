@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { useTranslation } from "@/lib/i18n/client";
 import data from "@emoji-mart/data";
@@ -90,6 +91,7 @@ export function EditListModal({
       parentId: list?.parentId ?? prefill?.parentId,
       type: list?.type ?? prefill?.type ?? "manual",
       query: list?.query ?? prefill?.query ?? undefined,
+      pinned: list?.pinned ?? prefill?.pinned ?? false,
     },
   });
   const [open, setOpen] = [
@@ -105,6 +107,7 @@ export function EditListModal({
       parentId: list?.parentId ?? prefill?.parentId,
       type: list?.type ?? prefill?.type ?? "manual",
       query: list?.query ?? prefill?.query ?? undefined,
+      pinned: list?.pinned ?? prefill?.pinned ?? false,
     });
   }, [open]);
 
@@ -391,6 +394,29 @@ export function EditListModal({
                 }}
               />
             )}
+            <FormField
+              control={form.control}
+              name="pinned"
+              render={({ field }) => {
+                return (
+                  <FormItem className="mb-4 flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>{t("lists.pin_list")}</FormLabel>
+                      <FormDescription>
+                        {t("lists.pin_list_description")}
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
             <DialogFooter className="sm:justify-end">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">

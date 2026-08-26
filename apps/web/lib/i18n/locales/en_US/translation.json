@@ -63,6 +63,8 @@
     "unarchive": "Un-archive",
     "favorite": "Favorite",
     "unfavorite": "Unfavorite",
+    "pin": "Pin",
+    "unpin": "Unpin",
     "delete": "Delete",
     "refresh": "Refresh",
     "recrawl": "Recrawl",
@@ -912,6 +914,9 @@
   "lists": {
     "all_lists": "All Lists",
     "favourites": "Favorites",
+    "pinned": "Pinned",
+    "pin_list": "Pin list",
+    "pin_list_description": "Show this list at the top of the sidebar and All Lists page.",
     "new_list": "New List",
     "edit_list": "Edit List",
     "new_nested_list": "New Nested List",

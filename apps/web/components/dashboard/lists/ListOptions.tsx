@@ -11,6 +11,8 @@ import {
   DoorOpen,
   FolderInput,
   Pencil,
+  Pin,
+  PinOff,
   Plus,
   Share,
   Square,
@@ -19,6 +21,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { useEditBookmarkList } from "@karakeep/shared-react/hooks/lists";
 import { ZBookmarkList } from "@karakeep/shared/types/lists";
 
 import { EditListModal } from "../lists/EditListModal";
@@ -41,6 +44,7 @@ export function ListOptions({
 }) {
   const { t } = useTranslation();
   const { showArchived, onClickShowArchived } = useShowArchived();
+  const { mutate: editList } = useEditBookmarkList();
 
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false);
   const [leaveListDialogOpen, setLeaveListDialogOpen] = useState(false);
@@ -73,6 +77,18 @@ export function ListOptions({
       visible: isOwner,
       disabled: false,
       onClick: () => setShareModalOpen(true),
+    },
+    {
+      id: "toggle-pin",
+      title: list.pinned ? t("actions.unpin") : t("actions.pin"),
+      icon: list.pinned ? (
+        <PinOff className="size-4" />
+      ) : (
+        <Pin className="size-4" />
+      ),
+      visible: isOwner,
+      disabled: false,
+      onClick: () => editList({ listId: list.id, pinned: !list.pinned }),
     },
     {
       id: "manage-collaborators",
