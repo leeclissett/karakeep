@@ -663,8 +663,8 @@
     {
       "idx": 94,
       "version": "6",
-      "when": 1787742000000,
-      "tag": "0094_add_pinned_to_lists",
+      "when": 1788015657987,
+      "tag": "0094_add_user_list_pins",
       "breakpoints": true
     }
   ]

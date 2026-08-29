@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useShowArchived } from "@/components/utils/useShowArchived";
+import { toast } from "@/components/ui/sonner";
 import { useTranslation } from "@/lib/i18n/client";
 import {
   DoorOpen,
@@ -44,7 +45,14 @@ export function ListOptions({
 }) {
   const { t } = useTranslation();
   const { showArchived, onClickShowArchived } = useShowArchived();
-  const { mutate: editList } = useEditBookmarkList();
+  const { mutate: editList, isPending: isPinning } = useEditBookmarkList({
+    onError: () => {
+      toast({
+        description: t("common.something_went_wrong"),
+        variant: "destructive",
+      });
+    },
+  });
 
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false);
   const [leaveListDialogOpen, setLeaveListDialogOpen] = useState(false);
@@ -86,8 +94,8 @@ export function ListOptions({
       ) : (
         <Pin className="size-4" />
       ),
-      visible: isOwner,
-      disabled: false,
+      visible: true,
+      disabled: isPinning,
       onClick: () => editList({ listId: list.id, pinned: !list.pinned }),
     },
     {

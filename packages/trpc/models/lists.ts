@@ -11,6 +11,7 @@ import {
   bookmarksInLists,
   listCollaborators,
   ruleEngineRulesTable,
+  userListPins,
   users,
 } from "@karakeep/db/schema";
 import { parseSearchQuery } from "@karakeep/shared/searchQueryParser";
@@ -67,8 +68,8 @@ export abstract class List {
       parentId: null,
       // Hide whether the list is public or not.
       public: false,
-      // Pinning is an owner-only preference.
-      pinned: false,
+      // Pinning is a preference of the current user.
+      pinned: this.list.pinned,
     };
   }
 
@@ -107,11 +108,19 @@ export abstract class List {
             },
             limit: 1,
           },
+          pins: {
+            where: eq(userListPins.userId, ctx.user.id),
+            columns: {
+              listId: true,
+            },
+            limit: 1,
+          },
         },
       });
       return l
         ? {
             ...l,
+            pinned: l.pins.length > 0,
             userRole: "owner",
             hasCollaborators: l.collaborators.length > 0,
           }
@@ -131,6 +140,15 @@ export abstract class List {
             columns: {
               rssToken: false,
             },
+            with: {
+              pins: {
+                where: eq(userListPins.userId, ctx.user.id),
+                columns: {
+                  listId: true,
+                },
+                limit: 1,
+              },
+            },
           },
         },
       });
@@ -138,6 +156,7 @@ export abstract class List {
       if (collaborator) {
         list = {
           ...collaborator.list,
+          pinned: collaborator.list.pins.length > 0,
           userRole: collaborator.role,
           hasCollaborators: true, // If you're a collaborator, the list has collaborators
         };
@@ -225,6 +244,7 @@ export abstract class List {
       authedCtx,
       {
         ...listdb,
+        pinned: false,
         userRole: "public",
         hasCollaborators: false, // Public lists don't expose collaborators
       },
@@ -258,23 +278,33 @@ export abstract class List {
     ctx: AuthedContext,
     input: z.infer<typeof zNewBookmarkListSchema>,
   ): Promise<ManualList | SmartList> {
-    const [result] = await ctx.db
-      .insert(bookmarkLists)
-      .values({
-        name: input.name,
-        description: input.description,
-        icon: input.icon,
-        userId: ctx.user.id,
-        parentId: input.parentId,
-        type: input.type,
-        query: input.query,
-        pinned: input.pinned ?? false,
-      })
-      .returning();
+    const result = await ctx.db.transaction(async (tx) => {
+      const [createdList] = await tx
+        .insert(bookmarkLists)
+        .values({
+          name: input.name,
+          description: input.description,
+          icon: input.icon,
+          userId: ctx.user.id,
+          parentId: input.parentId,
+          type: input.type,
+          query: input.query,
+        })
+        .returning();
+
+      if (input.pinned) {
+        await tx.insert(userListPins).values({
+          userId: ctx.user.id,
+          listId: createdList.id,
+        });
+      }
+      return createdList;
+    });
     return this.fromData(
       ctx,
       {
         ...result,
+        pinned: input.pinned ?? false,
         userRole: "owner",
         hasCollaborators: false, // Newly created lists have no collaborators
       },
@@ -338,6 +368,13 @@ export abstract class List {
           },
           limit: 1,
         },
+        pins: {
+          where: eq(userListPins.userId, ctx.user.id),
+          columns: {
+            listId: true,
+          },
+          limit: 1,
+        },
       },
     });
     return lists.map((l) =>
@@ -345,6 +382,7 @@ export abstract class List {
         ctx,
         {
           ...l,
+          pinned: l.pins.length > 0,
           userRole: "owner",
           hasCollaborators: l.collaborators.length > 0,
         },
@@ -368,6 +406,13 @@ export abstract class List {
                 id: true,
                 role: true,
               },
+            },
+            pins: {
+              where: eq(userListPins.userId, ctx.user.id),
+              columns: {
+                listId: true,
+              },
+              limit: 1,
             },
           },
         },
@@ -414,6 +459,7 @@ export abstract class List {
               ctx,
               {
                 ...l.list,
+                pinned: l.list.pins.length > 0,
                 userRole,
                 hasCollaborators:
                   userRole !== "owner"
@@ -637,43 +683,77 @@ export abstract class List {
   async update(
     input: z.infer<typeof zEditBookmarkListSchemaWithValidation>,
   ): Promise<void> {
-    this.ensureCanManage();
-    const result = await this.ctx.db
-      .update(bookmarkLists)
-      .set({
-        name: input.name,
-        description: input.description,
-        icon: input.icon,
-        parentId: input.parentId,
-        query: input.query,
-        public: input.public,
-        pinned: input.pinned,
-      })
-      .where(
-        and(
-          eq(bookmarkLists.id, this.list.id),
-          eq(bookmarkLists.userId, this.ctx.user.id),
-        ),
-      )
-      .returning();
-    if (result.length == 0) {
-      throw new TRPCError({ code: "NOT_FOUND" });
-    }
-    invariant(result[0].userId === this.ctx.user.id);
-    // Fetch current collaborators to update hasCollaborators
-    const collaboratorsCount =
-      await this.ctx.db.query.listCollaborators.findMany({
-        where: eq(listCollaborators.listId, this.list.id),
-        columns: {
-          id: true,
-        },
-        limit: 1,
-      });
-    this.list = {
-      ...result[0],
-      userRole: "owner",
-      hasCollaborators: collaboratorsCount.length > 0,
+    const listUpdates = {
+      name: input.name,
+      description: input.description,
+      icon: input.icon,
+      parentId: input.parentId,
+      query: input.query,
+      public: input.public,
     };
+    const hasListUpdates = Object.values(listUpdates).some(
+      (value) => value !== undefined,
+    );
+
+    if (hasListUpdates) {
+      this.ensureCanManage();
+      const result = await this.ctx.db
+        .update(bookmarkLists)
+        .set(listUpdates)
+        .where(
+          and(
+            eq(bookmarkLists.id, this.list.id),
+            eq(bookmarkLists.userId, this.ctx.user.id),
+          ),
+        )
+        .returning();
+      if (result.length == 0) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      invariant(result[0].userId === this.ctx.user.id);
+      // Fetch current collaborators to update hasCollaborators
+      const collaboratorsCount =
+        await this.ctx.db.query.listCollaborators.findMany({
+          where: eq(listCollaborators.listId, this.list.id),
+          columns: {
+            id: true,
+          },
+          limit: 1,
+        });
+      this.list = {
+        ...result[0],
+        pinned: this.list.pinned,
+        userRole: "owner",
+        hasCollaborators: collaboratorsCount.length > 0,
+      };
+    }
+
+    if (input.pinned !== undefined) {
+      await this.setPinned(input.pinned);
+    }
+  }
+
+  private async setPinned(pinned: boolean): Promise<void> {
+    this.ensureCanView();
+    if (pinned) {
+      await this.ctx.db
+        .insert(userListPins)
+        .values({
+          userId: this.ctx.user.id,
+          listId: this.list.id,
+        })
+        .onConflictDoNothing();
+    } else {
+      await this.ctx.db
+        .delete(userListPins)
+        .where(
+          and(
+            eq(userListPins.userId, this.ctx.user.id),
+            eq(userListPins.listId, this.list.id),
+          ),
+        );
+    }
+    this.list = { ...this.list, pinned };
   }
 
   private async setRssToken(token: string | null) {
@@ -764,6 +844,15 @@ export abstract class List {
         message: "Collaborator not found",
       });
     }
+
+    await this.ctx.db
+      .delete(userListPins)
+      .where(
+        and(
+          eq(userListPins.listId, this.list.id),
+          eq(userListPins.userId, userId),
+        ),
+      );
   }
 
   /**
@@ -795,6 +884,15 @@ export abstract class List {
         message: "Collaborator not found",
       });
     }
+
+    await this.ctx.db
+      .delete(userListPins)
+      .where(
+        and(
+          eq(userListPins.listId, this.list.id),
+          eq(userListPins.userId, this.ctx.user.id),
+        ),
+      );
   }
 
   /**
@@ -912,6 +1010,15 @@ export abstract class List {
           columns: {
             rssToken: false,
           },
+          with: {
+            pins: {
+              where: eq(userListPins.userId, ctx.user.id),
+              columns: {
+                listId: true,
+              },
+              limit: 1,
+            },
+          },
         },
       },
     });
@@ -921,6 +1028,7 @@ export abstract class List {
         ctx,
         {
           ...c.list,
+          pinned: c.list.pins.length > 0,
           userRole: c.role,
           hasCollaborators: true, // If you're a collaborator, the list has collaborators
         },

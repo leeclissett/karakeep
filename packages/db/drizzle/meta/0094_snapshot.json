@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a7c4e2b1-9d58-4f0a-8c3e-1b6d9f2a4e70",
+  "id": "6881bcbf-1144-4298-ada4-526c0f9b51e4",
   "prevId": "21170083-5dab-4bbf-803f-406ea6baeb30",
   "tables": {
     "account": {
@@ -749,14 +749,6 @@
         },
         "public": {
           "name": "public",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "pinned": {
-          "name": "pinned",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3140,6 +3132,81 @@
             "tagId"
           ],
           "name": "tagsOnBookmarks_bookmarkId_tagId_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "userListPins": {
+      "name": "userListPins",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listId": {
+          "name": "listId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pinnedAt": {
+          "name": "pinnedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "userListPins_userId_pinnedAt_idx": {
+          "name": "userListPins_userId_pinnedAt_idx",
+          "columns": [
+            "userId",
+            "pinnedAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "userListPins_userId_user_id_fk": {
+          "name": "userListPins_userId_user_id_fk",
+          "tableFrom": "userListPins",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "userListPins_listId_bookmarkLists_id_fk": {
+          "name": "userListPins_listId_bookmarkLists_id_fk",
+          "tableFrom": "userListPins",
+          "tableTo": "bookmarkLists",
+          "columnsFrom": [
+            "listId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "userListPins_userId_listId_pk": {
+          "columns": [
+            "userId",
+            "listId"
+          ],
+          "name": "userListPins_userId_listId_pk"
         }
       },
       "uniqueConstraints": {},

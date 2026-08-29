@@ -5,6 +5,7 @@ import { useBookmarkListLayoutMenu } from "@/components/bookmarks/BookmarkListHe
 import UpdatingBookmarkList from "@/components/bookmarks/UpdatingBookmarkList";
 import QueryPageState from "@/components/QueryPageState";
 import FullPageSpinner from "@/components/ui/FullPageSpinner";
+import { useToast } from "@/components/ui/Toast";
 import { useArchiveFilter } from "@/lib/hooks";
 import { useColorScheme } from "@/lib/useColorScheme";
 import { useMenuIconColors } from "@/lib/useMenuIconColors";
@@ -12,6 +13,7 @@ import { MenuView } from "@react-native-menu/menu";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Ellipsis } from "lucide-react-native";
 
+import { useEditBookmarkList } from "@karakeep/shared-react/hooks/lists";
 import { useTRPC } from "@karakeep/shared-react/trpc";
 import { ZBookmarkList } from "@karakeep/shared/types/lists";
 
@@ -35,7 +37,11 @@ export default function ListView() {
           headerTitle: list ? `${list.icon} ${list.name}` : "",
           headerBackTitle: "Back",
           headerRight: () => (
-            <ListActionsMenu listId={slug} role={list?.userRole ?? "viewer"} />
+            <ListActionsMenu
+              listId={slug}
+              pinned={list?.pinned ?? false}
+              role={list?.userRole ?? "viewer"}
+            />
           ),
         }}
       />
@@ -57,15 +63,23 @@ export default function ListView() {
 
 function ListActionsMenu({
   listId,
+  pinned,
   role,
 }: {
   listId: string;
+  pinned: boolean;
   role: ZBookmarkList["userRole"];
 }) {
   const api = useTRPC();
   const { colors } = useColorScheme();
   const { menuIconColor, destructiveMenuIconColor } = useMenuIconColors();
   const { layoutActions, handleLayoutAction } = useBookmarkListLayoutMenu();
+  const { toast } = useToast();
+  const { mutate: editList, isPending: isPinning } = useEditBookmarkList({
+    onError: () => {
+      toast({ message: "Something went wrong", variant: "destructive" });
+    },
+  });
   const { mutate: deleteList } = useMutation(
     api.lists.delete.mutationOptions({
       onSuccess: () => {
@@ -120,6 +134,19 @@ function ListActionsMenu({
       actions={[
         ...layoutActions,
         {
+          id: "toggle_pin",
+          title: pinned ? "Unpin List" : "Pin List",
+          attributes: {
+            disabled: isPinning,
+          },
+          image: Platform.select({
+            ios: pinned ? "pin.slash" : "pin",
+          }),
+          imageColor: Platform.select({
+            ios: menuIconColor,
+          }),
+        },
+        {
           id: "edit",
           title: "Edit List",
           attributes: {
@@ -166,7 +193,9 @@ function ListActionsMenu({
           return;
         }
 
-        if (nativeEvent.event === "delete_list") {
+        if (nativeEvent.event === "toggle_pin") {
+          editList({ listId, pinned: !pinned });
+        } else if (nativeEvent.event === "delete_list") {
           handleDelete();
         } else if (nativeEvent.event === "leave") {
           handleLeave();

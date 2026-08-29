@@ -87,7 +87,7 @@ const updateListFields = {
     `Whether the list is publicly accessible.`,
   ),
   pinned: sharedListEditShape.pinned.describe(
-    `Whether the list is pinned to the top of the lists sidebar and All Lists page.`,
+    `Whether the list is pinned for the current user.`,
   ),
 };
 
@@ -329,9 +329,7 @@ mcpServer.tool(
     pinned: z
       .boolean()
       .optional()
-      .describe(
-        `Whether to pin the list to the top of the lists sidebar and All Lists page.`,
-      ),
+      .describe(`Whether to pin the list for the current user.`),
   },
   async ({ name, icon, parentId, pinned }): Promise<CallToolResult> => {
     const res = await karakeepClient.POST("/lists", {

@@ -291,7 +291,7 @@ export interface paths {
     head?: never;
     /**
      * Update a list
-     * @description Partially update a list. Only the fields provided in the request body will be updated.
+     * @description Partially update a list. List metadata can only be changed by its owner; any user with access can change their own pinned preference.
      */
     patch: operations["updateList"];
     trace?: never;
@@ -986,7 +986,7 @@ export interface components {
       type: "manual" | "smart";
       query?: string | null;
       public: boolean;
-      /** @description Whether the list is pinned to the top of the lists sidebar and All Lists page. */
+      /** @description Whether the list is pinned for the current user. */
       pinned: boolean;
       hasCollaborators: boolean;
       /** @enum {string} */
@@ -2049,9 +2049,7 @@ export interface operations {
           type?: "manual" | "smart";
           query?: string;
           parentId?: string | null;
-          /**
-           * @description Whether the list is pinned to the top of the lists sidebar and All Lists page.
-           */
+          /** @description Whether the list should be pinned for the current user. */
           pinned?: boolean;
         };
       };
@@ -2176,7 +2174,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    /** @description The fields to update. Only the fields you want to change need to be provided. */
+    /** @description The fields to update. The pinned field applies only to the authenticated user. */
     requestBody?: {
       content: {
         "application/json": {
@@ -2186,6 +2184,7 @@ export interface operations {
           parentId?: string | null;
           query?: string;
           public?: boolean;
+          /** @description Whether the list is pinned for the current user. */
           pinned?: boolean;
         };
       };
@@ -2368,7 +2367,7 @@ export interface operations {
         sort?: "name" | "usage" | "relevance";
         attachedBy?: "ai" | "human" | "none";
         cursor?: string;
-        limit?: number | null;
+        limit?: number;
       };
       header?: never;
       path?: never;

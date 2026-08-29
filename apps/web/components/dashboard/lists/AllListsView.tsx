@@ -13,7 +13,7 @@ import {
   augmentBookmarkListsWithInitialData,
   useBookmarkLists,
 } from "@karakeep/shared-react/hooks/lists";
-import { getOwnedPinnedLists } from "@karakeep/shared/utils/listUtils";
+import { getPinnedLists } from "@karakeep/shared/utils/listUtils";
 
 import { CollapsibleBookmarkLists } from "./CollapsibleBookmarkLists";
 import { ListOptions } from "./ListOptions";
@@ -179,10 +179,7 @@ export default function AllListsView({
     return lists.data.some((list) => list.userRole === "owner");
   }, [lists.data]);
 
-  const pinnedLists = useMemo(
-    () => getOwnedPinnedLists(lists.data),
-    [lists.data],
-  );
+  const pinnedLists = useMemo(() => getPinnedLists(lists.data), [lists.data]);
 
   return (
     <div className="space-y-8">

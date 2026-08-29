@@ -1,1 +1,0 @@
-ALTER TABLE `bookmarkLists` ADD `pinned` integer DEFAULT false NOT NULL;

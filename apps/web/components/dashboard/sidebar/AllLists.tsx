@@ -25,7 +25,7 @@ import {
 } from "@karakeep/shared-react/hooks/lists";
 import { useTRPC } from "@karakeep/shared-react/trpc";
 import {
-  getOwnedPinnedLists,
+  getPinnedLists,
   ZBookmarkListTreeNode,
 } from "@karakeep/shared/utils/listUtils";
 
@@ -203,10 +203,7 @@ export default function AllLists({
     }),
   );
 
-  const pinnedLists = useMemo(
-    () => getOwnedPinnedLists(lists.data),
-    [lists.data],
-  );
+  const pinnedLists = useMemo(() => getPinnedLists(lists.data), [lists.data]);
 
   // Check if any shared list is currently being viewed
   const isViewingSharedList = useMemo(() => {

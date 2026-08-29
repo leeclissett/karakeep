@@ -87,7 +87,6 @@ export const listsAppRouter = router({
     .input(zEditBookmarkListSchemaWithValidation)
     .output(zBookmarkListSchema)
     .use(ensureListAtLeastViewer)
-    .use(ensureListAtLeastOwner)
     .mutation(async ({ input, ctx }) => {
       await ctx.list.update(input);
       if (input.public !== undefined) {

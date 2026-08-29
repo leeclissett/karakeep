@@ -20,7 +20,7 @@ import { Plus } from "lucide-react-native";
 import { useBookmarkLists } from "@karakeep/shared-react/hooks/lists";
 import { useTRPC } from "@karakeep/shared-react/trpc";
 import {
-  getOwnedPinnedLists,
+  getPinnedLists,
   ZBookmarkListTreeNode,
 } from "@karakeep/shared/utils/listUtils";
 
@@ -132,9 +132,9 @@ export default function Lists() {
     },
   ];
 
-  getOwnedPinnedLists(lists.data).forEach((list) => {
+  getPinnedLists(lists.data).forEach((list) => {
     links.push({
-      id: list.id,
+      id: `pinned-${list.id}`,
       logo: list.icon,
       name: list.name,
       href: `/dashboard/lists/${list.id}`,
