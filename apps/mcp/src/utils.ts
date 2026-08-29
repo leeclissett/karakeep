@@ -50,6 +50,7 @@ Description: ${list.description ?? ""}
 Parent ID: ${list.parentId ?? ""}
 Query: ${list.query ?? ""}
 Public: ${list.public}
+Pinned: ${list.pinned}
 Has collaborators: ${list.hasCollaborators}
 User role: ${list.userRole}`;
 }

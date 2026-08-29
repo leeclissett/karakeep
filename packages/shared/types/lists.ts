@@ -26,6 +26,12 @@ export const zNewBookmarkListSchema = z
     type: z.enum(["manual", "smart"]).optional().default("manual"),
     query: z.string().min(1).optional(),
     parentId: z.string().nullish(),
+    pinned: z
+      .boolean()
+      .optional()
+      .describe(
+        "Whether the list is pinned to the top of the lists sidebar and All Lists page.",
+      ),
   })
   .refine((val) => val.type === "smart" || !val.query, {
     message: "Manual lists cannot have a query",
@@ -57,6 +63,11 @@ export const zBookmarkListSchema = z.object({
   type: z.enum(["manual", "smart"]).default("manual"),
   query: z.string().nullish(),
   public: z.boolean(),
+  pinned: z
+    .boolean()
+    .describe(
+      "Whether the list is pinned to the top of the lists sidebar and All Lists page.",
+    ),
   hasCollaborators: z.boolean(),
   userRole: z.enum(["owner", "editor", "viewer", "public"]),
 });
@@ -85,6 +96,12 @@ export const zEditBookmarkListSchema = z.object({
   parentId: z.string().nullish(),
   query: z.string().min(1).optional(),
   public: z.boolean().optional(),
+  pinned: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the list is pinned to the top of the lists sidebar and All Lists page.",
+    ),
 });
 
 export const zEditBookmarkListSchemaWithValidation = zEditBookmarkListSchema

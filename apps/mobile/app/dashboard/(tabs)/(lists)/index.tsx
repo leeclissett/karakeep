@@ -19,7 +19,10 @@ import { Plus } from "lucide-react-native";
 
 import { useBookmarkLists } from "@karakeep/shared-react/hooks/lists";
 import { useTRPC } from "@karakeep/shared-react/trpc";
-import { ZBookmarkListTreeNode } from "@karakeep/shared/utils/listUtils";
+import {
+  getOwnedPinnedLists,
+  ZBookmarkListTreeNode,
+} from "@karakeep/shared/utils/listUtils";
 
 interface ListLink {
   id: string;
@@ -128,6 +131,19 @@ export default function Lists() {
       collapsed: false,
     },
   ];
+
+  getOwnedPinnedLists(lists.data).forEach((list) => {
+    links.push({
+      id: list.id,
+      logo: list.icon,
+      name: list.name,
+      href: `/dashboard/lists/${list.id}`,
+      level: 0,
+      numChildren: 0,
+      collapsed: false,
+      numBookmarks: listStats?.stats.get(list.id),
+    });
+  });
 
   // Add shared lists section if there are any
   if (hasSharedLists) {

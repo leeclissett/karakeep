@@ -986,6 +986,8 @@ export interface components {
       type: "manual" | "smart";
       query?: string | null;
       public: boolean;
+      /** @description Whether the list is pinned to the top of the lists sidebar and All Lists page. */
+      pinned: boolean;
       hasCollaborators: boolean;
       /** @enum {string} */
       userRole: "owner" | "editor" | "viewer" | "public";
@@ -2047,6 +2049,10 @@ export interface operations {
           type?: "manual" | "smart";
           query?: string;
           parentId?: string | null;
+          /**
+           * @description Whether the list is pinned to the top of the lists sidebar and All Lists page.
+           */
+          pinned?: boolean;
         };
       };
     };
@@ -2180,6 +2186,7 @@ export interface operations {
           parentId?: string | null;
           query?: string;
           public?: boolean;
+          pinned?: boolean;
         };
       };
     };

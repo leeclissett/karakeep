@@ -67,6 +67,7 @@ listsCmd
     "the search query for smart lists (required for smart lists)",
   )
   .option("--parent-id <id>", "the id of the parent list")
+  .option("--pinned", "pin the list")
   .action(async (opts) => {
     const api = getAPIClient();
 
@@ -78,6 +79,7 @@ listsCmd
         description: opts.description,
         query: opts.query,
         parentId: opts.parentId,
+        pinned: opts.pinned,
       })
       .then(printObject)
       .catch(printError("Failed to create list"));
@@ -136,6 +138,7 @@ listsCmd
         if (list.query) console.log(`  Query: ${list.query}`);
         if (list.parentId) console.log(`  Parent: ${list.parentId}`);
         console.log(`  Public: ${list.public ? "yes" : "no"}`);
+        console.log(`  Pinned: ${list.pinned ? "yes" : "no"}`);
         console.log(`  Role: ${list.userRole}`);
         if (list.hasCollaborators) console.log(`  Collaborators: yes`);
         console.log();
@@ -177,4 +180,36 @@ listsCmd
           `Failed to remove bookmark "${opts.bookmark}" from list with id "${opts.list}"`,
         ),
       );
+  });
+
+listsCmd
+  .command("pin")
+  .description("pin a list")
+  .argument("<id>", "the id of the list")
+  .action(async (id) => {
+    const api = getAPIClient();
+
+    await api.lists.edit
+      .mutate({
+        listId: id,
+        pinned: true,
+      })
+      .then(printSuccess(`Successfully pinned list with id "${id}"`))
+      .catch(printError(`Failed to pin list with id "${id}"`));
+  });
+
+listsCmd
+  .command("unpin")
+  .description("unpin a list")
+  .argument("<id>", "the id of the list")
+  .action(async (id) => {
+    const api = getAPIClient();
+
+    await api.lists.edit
+      .mutate({
+        listId: id,
+        pinned: false,
+      })
+      .then(printSuccess(`Successfully unpinned list with id "${id}"`))
+      .catch(printError(`Failed to unpin list with id "${id}"`));
   });

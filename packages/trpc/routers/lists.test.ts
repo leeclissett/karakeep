@@ -88,6 +88,43 @@ describe("Lists Routes", () => {
     ).rejects.toThrow(/List not found/);
   });
 
+  test<CustomTestContext>("pin list", async ({ apiCallers }) => {
+    const api = apiCallers[0].lists;
+
+    const createdList = await api.create({
+      name: "Unpinned List",
+      icon: "📋",
+      type: "manual",
+    });
+    expect(createdList.pinned).toBe(false);
+
+    const pinnedOnCreate = await api.create({
+      name: "Pinned On Create",
+      icon: "📌",
+      type: "manual",
+      pinned: true,
+    });
+    expect(pinnedOnCreate.pinned).toBe(true);
+
+    const pinnedList = await api.edit({
+      listId: createdList.id,
+      pinned: true,
+    });
+    expect(pinnedList.pinned).toBe(true);
+
+    const lists = await api.list();
+    expect(lists.lists.find((l) => l.id === createdList.id)?.pinned).toBe(true);
+    expect(lists.lists.find((l) => l.id === pinnedOnCreate.id)?.pinned).toBe(
+      true,
+    );
+
+    const unpinnedList = await api.edit({
+      listId: createdList.id,
+      pinned: false,
+    });
+    expect(unpinnedList.pinned).toBe(false);
+  });
+
   test<CustomTestContext>("merge lists", async ({ apiCallers }) => {
     const api = apiCallers[0].lists;
 
