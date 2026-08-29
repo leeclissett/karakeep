@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/sonner";
 import { BOOKMARK_DRAG_MIME } from "@/lib/bookmark-drag";
 import { useTranslation } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 import type { ZBookmarkList } from "@karakeep/shared/types/lists";
@@ -22,7 +23,11 @@ import {
   useAddBookmarkToList,
   useBookmarkLists,
 } from "@karakeep/shared-react/hooks/lists";
-import { ZBookmarkListTreeNode } from "@karakeep/shared/utils/listUtils";
+import { useTRPC } from "@karakeep/shared-react/trpc";
+import {
+  getPinnedLists,
+  ZBookmarkListTreeNode,
+} from "@karakeep/shared/utils/listUtils";
 
 import { CollapsibleBookmarkLists } from "../lists/CollapsibleBookmarkLists";
 import { EditListModal } from "../lists/EditListModal";
@@ -191,6 +196,15 @@ export default function AllLists({
     initialData.lists,
   );
 
+  const api = useTRPC();
+  const { data: listStats } = useQuery(
+    api.lists.stats.queryOptions(undefined, {
+      placeholderData: keepPreviousData,
+    }),
+  );
+
+  const pinnedLists = useMemo(() => getPinnedLists(lists.data), [lists.data]);
+
   // Check if any shared list is currently being viewed
   const isViewingSharedList = useMemo(() => {
     return lists.data.some(
@@ -242,6 +256,18 @@ export default function AllLists({
         path={`/dashboard/favourites`}
         linkClassName="py-0.5 px-1"
       />
+
+      {pinnedLists.map((list) => (
+        <DroppableListSidebarItem
+          key={list.id}
+          node={{ item: list, children: [] }}
+          level={0}
+          open={false}
+          numBookmarks={listStats?.stats.get(list.id)}
+          selectedListId={selectedListId}
+          setSelectedListId={setSelectedListId}
+        />
+      ))}
 
       {/* Owned Lists */}
       <CollapsibleBookmarkLists

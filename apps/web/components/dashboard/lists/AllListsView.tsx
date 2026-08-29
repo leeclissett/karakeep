@@ -13,6 +13,7 @@ import {
   augmentBookmarkListsWithInitialData,
   useBookmarkLists,
 } from "@karakeep/shared-react/hooks/lists";
+import { getPinnedLists } from "@karakeep/shared/utils/listUtils";
 
 import { CollapsibleBookmarkLists } from "./CollapsibleBookmarkLists";
 import { ListOptions } from "./ListOptions";
@@ -178,9 +179,11 @@ export default function AllListsView({
     return lists.data.some((list) => list.userRole === "owner");
   }, [lists.data]);
 
+  const pinnedLists = useMemo(() => getPinnedLists(lists.data), [lists.data]);
+
   return (
     <div className="space-y-8">
-      <Section title="Pinned">
+      <Section title={t("lists.pinned")}>
         <ul className="divide-y">
           <ListItem
             collapsible={false}
@@ -200,6 +203,18 @@ export default function AllListsView({
             path={`/dashboard/archive`}
             pinned
           />
+          {pinnedLists.map((list) => (
+            <ListItem
+              key={list.id}
+              collapsible={false}
+              name={list.name}
+              icon={list.icon}
+              description={list.description ?? undefined}
+              list={list}
+              path={`/dashboard/lists/${list.id}`}
+              pinned
+            />
+          ))}
         </ul>
       </Section>
 
@@ -219,6 +234,7 @@ export default function AllListsView({
                 path={`/dashboard/lists/${node.item.id}`}
                 collapsible={node.children.length > 0}
                 open={open}
+                pinned={node.item.pinned}
                 style={{ marginLeft: `${level * 1}rem` }}
               />
             )}

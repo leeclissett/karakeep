@@ -61,3 +61,9 @@ export function listsToTree(lists: ZBookmarkList[]) {
 
 export const listNameFromPath = (path: ZBookmarkList[]) =>
   path.map((p) => `${p.icon} ${p.name}`).join(" / ");
+
+export function getPinnedLists(lists: ZBookmarkList[]): ZBookmarkList[] {
+  return lists
+    .filter((list) => list.pinned)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

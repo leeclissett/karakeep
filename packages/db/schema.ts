@@ -540,6 +540,25 @@ export const bookmarkLists = sqliteTable(
   ],
 );
 
+export const userListPins = sqliteTable(
+  "userListPins",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    listId: text("listId")
+      .notNull()
+      .references(() => bookmarkLists.id, { onDelete: "cascade" }),
+    pinnedAt: integer("pinnedAt", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (pin) => [
+    primaryKey({ columns: [pin.userId, pin.listId] }),
+    index("userListPins_userId_pinnedAt_idx").on(pin.userId, pin.pinnedAt),
+  ],
+);
+
 export const bookmarksInLists = sqliteTable(
   "bookmarksInLists",
   {
@@ -1068,6 +1087,7 @@ export const userRelations = relations(users, ({ many, one }) => ({
   subscription: one(subscriptions),
   importSessions: many(importSessions),
   listCollaborations: many(listCollaborators),
+  listPins: many(userListPins),
   backups: many(backupsTable),
   listInvitations: many(listInvitations),
 }));
@@ -1141,6 +1161,7 @@ export const bookmarkListsRelations = relations(
     bookmarksInLists: many(bookmarksInLists),
     collaborators: many(listCollaborators),
     invitations: many(listInvitations),
+    pins: many(userListPins),
     user: one(users, {
       fields: [bookmarkLists.userId],
       references: [users.id],
@@ -1151,6 +1172,17 @@ export const bookmarkListsRelations = relations(
     }),
   }),
 );
+
+export const userListPinsRelations = relations(userListPins, ({ one }) => ({
+  user: one(users, {
+    fields: [userListPins.userId],
+    references: [users.id],
+  }),
+  list: one(bookmarkLists, {
+    fields: [userListPins.listId],
+    references: [bookmarkLists.id],
+  }),
+}));
 
 export const bookmarksInListsRelations = relations(
   bookmarksInLists,

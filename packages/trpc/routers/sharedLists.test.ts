@@ -2925,4 +2925,70 @@ describe("Shared Lists", () => {
       });
     });
   });
+
+  describe("Pinned lists", () => {
+    test<CustomTestContext>("each user can pin a shared list independently", async ({
+      apiCallers,
+    }) => {
+      const ownerApi = apiCallers[0];
+      const collaboratorApi = apiCallers[1];
+
+      const list = await ownerApi.lists.create({
+        name: "Pinned Shared List",
+        icon: "📌",
+        type: "manual",
+        pinned: true,
+      });
+
+      await addAndAcceptCollaborator(
+        ownerApi,
+        collaboratorApi,
+        list.id,
+        "editor",
+      );
+
+      const ownerView = await ownerApi.lists.get({ listId: list.id });
+      expect(ownerView.pinned).toBe(true);
+
+      const collabView = await collaboratorApi.lists.get({ listId: list.id });
+      expect(collabView.pinned).toBe(false);
+
+      const pinnedByCollaborator = await collaboratorApi.lists.edit({
+        listId: list.id,
+        pinned: true,
+      });
+      expect(pinnedByCollaborator.pinned).toBe(true);
+
+      await ownerApi.lists.edit({ listId: list.id, pinned: false });
+      expect((await ownerApi.lists.get({ listId: list.id })).pinned).toBe(
+        false,
+      );
+      expect(
+        (await collaboratorApi.lists.get({ listId: list.id })).pinned,
+      ).toBe(true);
+
+      const collabLists = await collaboratorApi.lists.list();
+      expect(collabLists.lists.find((l) => l.id === list.id)?.pinned).toBe(
+        true,
+      );
+
+      await expect(
+        collaboratorApi.lists.edit({
+          listId: list.id,
+          name: "Collaborator cannot rename this",
+          pinned: false,
+        }),
+      ).rejects.toThrow(/not allowed to manage this list/);
+
+      expect(
+        (await collaboratorApi.lists.get({ listId: list.id })).pinned,
+      ).toBe(true);
+
+      const unpinnedByCollaborator = await collaboratorApi.lists.edit({
+        listId: list.id,
+        pinned: false,
+      });
+      expect(unpinnedByCollaborator.pinned).toBe(false);
+    });
+  });
 });

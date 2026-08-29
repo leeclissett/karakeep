@@ -124,6 +124,7 @@ describe("get-bookmark-lists", () => {
             parentId: null,
             query: null,
             public: false,
+            pinned: false,
             hasCollaborators: false,
             userRole: "owner",
           },

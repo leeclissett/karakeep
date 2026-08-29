@@ -41,6 +41,7 @@ const sampleList = {
   parentId: null,
   query: null,
   public: false,
+  pinned: false,
   hasCollaborators: false,
   userRole: "owner" as const,
 };
@@ -98,6 +99,7 @@ describe("get-list", () => {
     expect(text).toContain("Name: Reading");
     expect(text).toContain("Type: manual");
     expect(text).toContain("Public: false");
+    expect(text).toContain("Pinned: false");
   });
 
   it("returns an MCP error when the list is not found", async () => {

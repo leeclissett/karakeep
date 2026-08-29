@@ -86,6 +86,9 @@ const updateListFields = {
   public: sharedListEditShape.public.describe(
     `Whether the list is publicly accessible.`,
   ),
+  pinned: sharedListEditShape.pinned.describe(
+    `Whether the list is pinned for the current user.`,
+  ),
 };
 
 export const updateListInputSchema = {
@@ -112,7 +115,7 @@ export async function updateListHandler(
 
   if (Object.keys(body).length === 0) {
     return toMcpToolError(
-      `update-list requires at least one field to update (name, icon, description, parentId, query, or public).`,
+      `update-list requires at least one field to update (name, icon, description, parentId, query, public, or pinned).`,
     );
   }
 
@@ -323,13 +326,18 @@ mcpServer.tool(
       .string()
       .optional()
       .describe(`The parent list id of this list.`),
+    pinned: z
+      .boolean()
+      .optional()
+      .describe(`Whether to pin the list for the current user.`),
   },
-  async ({ name, icon, parentId }): Promise<CallToolResult> => {
+  async ({ name, icon, parentId, pinned }): Promise<CallToolResult> => {
     const res = await karakeepClient.POST("/lists", {
       body: {
         name,
         icon,
         parentId,
+        pinned,
       },
     });
     if (!res.data) {

@@ -163,7 +163,7 @@ registry.registerPath({
   method: "patch",
   path: "/lists/{listId}",
   description:
-    "Partially update a list. Only the fields provided in the request body will be updated.",
+    "Partially update a list. List metadata can only be changed by its owner; any user with access can change their own pinned preference.",
   summary: "Update a list",
   tags: ["Lists"],
   security: [{ [BearerAuth.name]: [] }],
@@ -171,7 +171,7 @@ registry.registerPath({
     params: z.object({ listId: ListIdSchema }),
     body: {
       description:
-        "The fields to update. Only the fields you want to change need to be provided.",
+        "The fields to update. The pinned field applies only to the authenticated user.",
       content: {
         "application/json": {
           schema: zEditBookmarkListSchema.omit({ listId: true }),

@@ -347,12 +347,13 @@ async function migrateLists(
 
         if (match) {
           created.set(id, match.id);
-          // Align public flag if required (best-effort)
-          if (typeof l.public === "boolean" && match.public !== l.public) {
+          // Align visibility and the current user's pin preference (best-effort)
+          if (match.public !== l.public || match.pinned !== l.pinned) {
             try {
               await dest.lists.edit.mutate({
                 listId: match.id,
-                public: l.public,
+                public: match.public !== l.public ? l.public : undefined,
+                pinned: match.pinned !== l.pinned ? l.pinned : undefined,
               });
             } catch {
               // ignore failures
@@ -370,6 +371,7 @@ async function migrateLists(
             type: l.type,
             query: l.query ?? undefined,
             parentId: parentDestId,
+            pinned: l.pinned,
           });
           // Apply visibility if needed
           if (typeof l.public === "boolean") {
