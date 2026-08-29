@@ -190,15 +190,18 @@ export function useUpdateBookmarkTags(
           queryClient.invalidateQueries(
             api.tags.get.queryFilter({ tagId: id }),
           );
-          scheduleInvalidateQueries(
-            queryClient,
-            api.bookmarks.getBookmarks.queryFilter({ tagId: id }),
-          );
-          scheduleInvalidateQueries(
-            queryClient,
-            api.bookmarks.getBookmarks.infiniteQueryFilter({ tagId: id }),
-          );
         });
+        // Broad invalidation (instead of only the affected tagIds) so that
+        // smart lists whose queries depend on tags (e.g. `#tag`) get
+        // refreshed as well.
+        scheduleInvalidateQueries(
+          queryClient,
+          api.bookmarks.getBookmarks.pathFilter(),
+        );
+        scheduleInvalidateQueries(
+          queryClient,
+          api.bookmarks.searchBookmarks.pathFilter(),
+        );
         scheduleInvalidateQueries(queryClient, api.tags.list.pathFilter());
         scheduleInvalidateQueries(queryClient, api.lists.stats.pathFilter());
         return opts?.onSuccess?.(res, req, meta, context);

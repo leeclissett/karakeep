@@ -90,15 +90,16 @@ export function useAddBookmarkToList(
     api.lists.addToList.mutationOptions({
       ...opts,
       onSuccess: (res, req, meta, context) => {
+        // Broad invalidation (instead of only the target listId) so that
+        // smart lists whose queries depend on list membership (e.g.
+        // `is:inlist` or `list:...`) get refreshed as well.
         scheduleInvalidateQueries(
           queryClient,
-          api.bookmarks.getBookmarks.queryFilter({ listId: req.listId }),
+          api.bookmarks.getBookmarks.pathFilter(),
         );
         scheduleInvalidateQueries(
           queryClient,
-          api.bookmarks.getBookmarks.infiniteQueryFilter({
-            listId: req.listId,
-          }),
+          api.bookmarks.searchBookmarks.pathFilter(),
         );
         queryClient.invalidateQueries(
           api.lists.getListsOfBookmark.queryFilter({
@@ -121,15 +122,16 @@ export function useRemoveBookmarkFromList(
     api.lists.removeFromList.mutationOptions({
       ...opts,
       onSuccess: (res, req, meta, context) => {
+        // Broad invalidation (instead of only the target listId) so that
+        // smart lists whose queries depend on list membership (e.g.
+        // `is:inlist` or `list:...`) get refreshed as well.
         scheduleInvalidateQueries(
           queryClient,
-          api.bookmarks.getBookmarks.queryFilter({ listId: req.listId }),
+          api.bookmarks.getBookmarks.pathFilter(),
         );
         scheduleInvalidateQueries(
           queryClient,
-          api.bookmarks.getBookmarks.infiniteQueryFilter({
-            listId: req.listId,
-          }),
+          api.bookmarks.searchBookmarks.pathFilter(),
         );
         queryClient.invalidateQueries(
           api.lists.getListsOfBookmark.queryFilter({
