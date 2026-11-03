@@ -1,6 +1,7 @@
 import { Pressable, ScrollView } from "react-native";
 import { Link, Stack, useLocalSearchParams } from "expo-router";
 import {
+  byListPathName,
   ListPicker,
   listPathToPickerOption,
 } from "@/components/lists/list-picker";
@@ -101,7 +102,8 @@ const ListPickerPage = () => {
   const { allPaths } = data ?? {};
   const filteredPaths = allPaths
     ?.filter((path) => path[path.length - 1].userRole !== "viewer")
-    .filter((path) => path[path.length - 1].type !== "smart");
+    .filter((path) => path[path.length - 1].type !== "smart")
+    .sort(byListPathName);
   const options =
     filteredPaths?.map((path) => {
       const option = listPathToPickerOption(path);

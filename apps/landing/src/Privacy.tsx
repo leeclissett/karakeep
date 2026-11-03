@@ -36,8 +36,8 @@ export default function PrivacyPolicy() {
           <li>
             <strong>Content you provide</strong>: links, notes, uploads, and
             other data you choose to save in the Service. We may process this
-            content — including via third-party artificial intelligence
-            providers — to provide features such as full-text search, automatic
+            content, including via third-party artificial intelligence
+            providers, to provide features such as full-text search, automatic
             tagging, and AI-powered summaries.
           </li>
           <li>
@@ -218,7 +218,7 @@ export default function PrivacyPolicy() {
         </p>
         <p className="text-base leading-relaxed text-gray-700">
           You can submit privacy requests by emailing info@localhostlabs.co.uk
-          or support@karakeep.app. We respond within timelines required by
+          or support@karakeep.com. We respond within timelines required by
           applicable law.
         </p>
 
@@ -282,10 +282,10 @@ export default function PrivacyPolicy() {
           <br />
           Support:{" "}
           <a
-            href="mailto:support@karakeep.app"
+            href="mailto:support@karakeep.com"
             className="text-blue-600 hover:underline"
           >
-            support@karakeep.app
+            support@karakeep.com
           </a>
         </p>
       </main>
