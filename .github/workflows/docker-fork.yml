@@ -19,6 +19,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v5
+        id: build
         with:
           context: .
           file: docker/Dockerfile
@@ -26,9 +27,15 @@ jobs:
           platforms: linux/amd64
           push: true
           build-args: SERVER_VERSION=fork-${{ github.sha }}
+          # Floating tags only move on pushes to lee. A workflow_dispatch on
+          # any other branch (e.g. to test a PR) publishes fork-<sha> only.
           tags: |
-            ghcr.io/leeclissett/karakeep:latest
-            ghcr.io/leeclissett/karakeep:fork
             ghcr.io/leeclissett/karakeep:fork-${{ github.sha }}
+            ${{ github.ref == 'refs/heads/lee' && 'ghcr.io/leeclissett/karakeep:fork' || '' }}
+            ${{ github.ref == 'refs/heads/lee' && 'ghcr.io/leeclissett/karakeep:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Image digest
+        run: |
+          echo "ghcr.io/leeclissett/karakeep:fork-${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "digest: ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
