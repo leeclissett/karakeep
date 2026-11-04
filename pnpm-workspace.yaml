@@ -86,6 +86,18 @@ minimumReleaseAgeExclude: [
     "@better-auth/telemetry@1.7.16",
     better-auth@1.7.16,
     better-call@1.4.5,
+    # Fork: Next.js Nov 3, 2026 security release.
+    "@next/bundle-analyzer@16.4.5",
+    "@next/env@16.4.5",
+    "@next/swc-darwin-arm64@16.4.5",
+    "@next/swc-darwin-x64@16.4.5",
+    "@next/swc-linux-arm64-gnu@16.4.5",
+    "@next/swc-linux-arm64-musl@16.4.5",
+    "@next/swc-linux-x64-gnu@16.4.5",
+    "@next/swc-linux-x64-musl@16.4.5",
+    "@next/swc-win32-arm64-msvc@16.4.5",
+    "@next/swc-win32-x64-msvc@16.4.5",
+    next@16.4.5,
   ]
 
 overrides:
@@ -111,3 +123,38 @@ overrides:
   react-dom: 19.2.3
   "@types/react": 19.2.15
   "@types/react-dom": 19.2.3
+  # Fork: transitive security fixes not yet picked up upstream (Nov 2026).
+  # One entry per undici major in the tree, so no parent is moved across a
+  # major. 6.x: @sentry/cli, @apidevtools/json-schema-ref-parser,
+  # @karakeep/shared; 7.x: cheerio; 8.x: jsdom, node-gyp, unifont.
+  # GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26, GHSA-qrxm-fqhp-jwvm,
+  # GHSA-xjj6-f33q-929c.
+  "undici@6": ^6.29.1
+  "undici@7": ^7.30.1
+  "undici@8": ^8.12.2
+  # Expo CLI / code signing. GHSA-5x38-2vff-x55p, GHSA-jc66-7q78-782g.
+  "node-forge@1": ^1.4.1
+  # http-proxy. GHSA-8r9p-f939-6h3c.
+  "follow-redirects@1": ^1.16.2
+  # express 4 asks for ~1.20.5. GHSA-27r3-jxmh-p828.
+  "body-parser@1": ~1.20.9
+  # Fork: in-major fixes for other high findings from `pnpm audit` (Nov 2026).
+  # zod 4.x is used by web, workers and every server package.
+  # GHSA-mrhx-c7xc-m3w5.
+  "zod@4": ^4.6.6
+  # Dev/build only (vitest and the vite-built apps). GHSA-587h-7wmj-h5pm.
+  "vite@8": ^8.3.3
+  # apps/mcp. GHSA-jm63-cq47-j5jp, GHSA-46jr-4wx8-v453, GHSA-f897-62hf-6gxq.
+  "@modelcontextprotocol/server@2": ^2.3.0
+  # Docs only (Docusaurus). GHSA-4528-x5fx-h6hg, GHSA-587h-7wmj-h5pm.
+  "joi@17": ^17.13.9
+  "launch-editor@2": ^2.14.2
+  # Docusaurus asks for tinypool ^1 and every 1.x is affected (no 1.x fix).
+  # Its SSG executor only uses options that 2.x keeps unchanged, and 2.x is
+  # already in the tree via vitest. GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr.
+  "tinypool@1": ^2.2.0
+  # Moderate, but in the shipped server: hono (web/api) GHSA-5r4p-p66f-jhc7;
+  # nodemailer (trpc email) GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w,
+  # GHSA-85x2-q946-cp5h.
+  "hono@4": ^4.13.11
+  "nodemailer@10": ^10.1.4

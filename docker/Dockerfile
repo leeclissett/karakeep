@@ -1,3 +1,11 @@
+# Node base image, pinned by digest so a rebuild can't silently pick up a
+# different image. The tag is informational; the digest is what gets pulled.
+# To bump (e.g. for a Node.js security release), take the multi-arch index
+# digest of the new tag and replace this line:
+#   docker buildx imagetools inspect node:24-slim --format '{{json .Manifest.Digest}}'
+# Override at build time with --build-arg NODE_IMAGE=... if needed.
+ARG NODE_IMAGE=node:24.22.2-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
+
 ################# Monolith Builder ##############
 FROM rust:1-bookworm AS monolith_builder
 
@@ -13,7 +21,7 @@ RUN apt-get update \
     && cargo install monolith --version "${MONOLITH_VERSION}" --locked
 
 ################# Base Builder ##############
-FROM node:24-slim AS base
+FROM ${NODE_IMAGE} AS base
 
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
@@ -107,7 +115,7 @@ FROM base AS mcp_builder
 RUN (cd apps/mcp && pnpm build)
 
 ################# The All-in-one builder ##############
-FROM node:24-slim AS aio_builder
+FROM ${NODE_IMAGE} AS aio_builder
 LABEL org.opencontainers.image.source="https://github.com/karakeep-app/karakeep"
 WORKDIR /app
 
@@ -257,7 +265,7 @@ RUN rm /etc/s6-overlay/s6-rc.d/svc-workers/dependencies.d/init-db-migration \
 ENV USING_LEGACY_SEPARATE_CONTAINERS=true
 
 ################# The cli ##############
-FROM node:24-slim AS cli
+FROM ${NODE_IMAGE} AS cli
 LABEL org.opencontainers.image.source="https://github.com/karakeep-app/karakeep"
 WORKDIR /app
 
@@ -271,7 +279,7 @@ ENV SERVER_VERSION=${SERVER_VERSION}
 ENTRYPOINT ["node", "index.mjs"]
 
 ################# MCP server ##############
-FROM node:24-slim AS mcp
+FROM ${NODE_IMAGE} AS mcp
 LABEL org.opencontainers.image.source="https://github.com/karakeep-app/karakeep"
 WORKDIR /app
 
