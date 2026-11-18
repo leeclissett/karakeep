@@ -1,10 +1,8 @@
-# Node base image, pinned by digest so a rebuild can't silently pick up a
-# different image. The tag is informational; the digest is what gets pulled.
-# To bump (e.g. for a Node.js security release), take the multi-arch index
-# digest of the new tag and replace this line:
-#   docker buildx imagetools inspect node:24-slim --format '{{json .Manifest.Digest}}'
-# Override at build time with --build-arg NODE_IMAGE=... if needed.
-ARG NODE_IMAGE=node:24.22.2-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
+# Node base image, pinned to an exact release so a rebuild can't silently pick
+# up a different Node. To bump (e.g. for a Node.js security release), change
+# the version in this line. Override at build time with
+# --build-arg NODE_IMAGE=... if needed.
+ARG NODE_IMAGE=node:24.22.3-slim
 
 ################# Monolith Builder ##############
 FROM rust:1-bookworm AS monolith_builder
