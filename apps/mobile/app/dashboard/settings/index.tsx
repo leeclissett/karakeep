@@ -4,64 +4,68 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
-  Switch,
   TextInput,
   View,
 } from "react-native";
-import Slider from "@react-native-community/slider";
 import Constants from "expo-constants";
-import { Link } from "expo-router";
-import { useHeaderHeight } from "expo-router/react-navigation";
+import { useRouter } from "expo-router";
+import {
+  SettingsActionRow,
+  SettingsGroup,
+  SettingsNavigationRow,
+  SettingsScreen,
+  SettingsSeparator,
+  SettingsValueRow,
+} from "@/components/settings/settings-list";
 import { UserProfileHeader } from "@/components/settings/UserProfileHeader";
-import ChevronRight from "@/components/ui/ChevronRight";
-import { Divider } from "@/components/ui/Divider";
 import { Text } from "@/components/ui/Text";
+import { useClientConfig } from "@/lib/client-config";
 import { useServerVersion } from "@/lib/hooks";
+import { getSystemLanguage } from "@/lib/i18n";
+import { useCommonActions, useTranslation } from "@/lib/i18n/hooks";
 import {
   getOfflineLibraryScope,
   useOfflineLibrary,
 } from "@/lib/offlineLibrary";
 import { useSession } from "@/lib/session";
+import {
+  getBookmarkViewLabels,
+  getTranslatedUploadQualityLabel,
+} from "@/lib/settings-display";
 import useAppSettings from "@/lib/settings";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { langNameMappings } from "@karakeep/shared/langs";
 import { useTRPC } from "@karakeep/shared-react/trpc";
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <Text className="px-4 pb-1 pt-4 text-xs uppercase tracking-wide text-muted-foreground">
-      {title}
-    </Text>
-  );
-}
-
 export default function Settings() {
-  const { logout } = useSession();
-  const headerHeight = useHeaderHeight();
-  const {
-    settings,
-    setSettings,
-    isLoading: isSettingsLoading,
-  } = useAppSettings();
+  const router = useRouter();
   const api = useTRPC();
+  const { logout } = useSession();
+  const { settings, isLoading } = useAppSettings();
+  const { t } = useTranslation();
+  const actions = useCommonActions();
   const offlineLibrary = useOfflineLibrary(getOfflineLibraryScope(settings));
-
-  const [imageQuality, setImageQuality] = useState<number | null>(null);
-
-  useEffect(() => {
-    setImageQuality(settings.imageQuality * 100);
-  }, [settings.imageQuality]);
-
   const { data, error } = useQuery(api.users.whoami.queryOptions());
-  const {
-    data: serverVersion,
-    isLoading: isServerVersionLoading,
-    error: serverVersionError,
-  } = useServerVersion();
-
+  const { data: serverVersion } = useServerVersion();
+  const clientConfig = useClientConfig();
+  const showSubscription =
+    clientConfig.stripe.isConfigured || clientConfig.revenueCat.isConfigured;
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
+
+  const themeLabels = {
+    dark: t("settings.theme_option_dark"),
+    light: t("settings.theme_option_light"),
+    system: t("settings.theme_system"),
+  };
+  const systemLanguage = getSystemLanguage();
+  const languageLabel =
+    settings.language === "system" || !settings.language
+      ? t("settings.language_system", {
+          language: langNameMappings[systemLanguage] ?? systemLanguage,
+        })
+      : (langNameMappings[settings.language] ?? settings.language);
 
   const { mutate: deleteAccount, isPending: isDeleting } = useMutation(
     api.users.deleteAccount.mutationOptions({
@@ -69,34 +73,57 @@ export default function Settings() {
         setShowPasswordModal(false);
         setPassword("");
         Alert.alert(
-          "Account Deleted",
-          "Your account has been successfully deleted.",
-          [{ text: "OK", onPress: logout }],
+          t("settings.account_deleted_title"),
+          t("settings.account_deleted_message"),
+          [{ text: t("actions.ok"), onPress: logout }],
         );
       },
-      onError: (e) => {
-        if (e.data?.code === "UNAUTHORIZED") {
-          Alert.alert("Error", "Invalid password. Please try again.");
+      onError: (mutationError) => {
+        if (mutationError.data?.code === "UNAUTHORIZED") {
+          Alert.alert(
+            t("app.error_title"),
+            t("settings.delete_invalid_password"),
+          );
         } else {
-          Alert.alert("Error", "Failed to delete account. Please try again.");
+          Alert.alert(t("app.error_title"), t("settings.delete_failed"));
         }
       },
     }),
   );
 
-  const isLocalUser = data?.localUser ?? false;
+  useEffect(() => {
+    if (error?.data?.code === "UNAUTHORIZED") {
+      void logout();
+    }
+  }, [error?.data?.code, logout]);
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setPassword("");
+  };
+
+  const handleLogout = () => {
+    Alert.alert(t("settings.log_out_title"), t("settings.log_out_message"), [
+      { text: actions.cancel, style: "cancel" },
+      {
+        text: t("auth.log_out"),
+        style: "destructive",
+        onPress: () => void logout(),
+      },
+    ]);
+  };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? All your bookmarks, lists, tags, highlights, and other data will be permanently deleted. This action cannot be undone.",
+      t("settings.delete_account_confirm_title"),
+      t("settings.delete_account_confirm_message"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: actions.cancel, style: "cancel" },
         {
-          text: "Delete",
+          text: t("bookmark_actions.delete"),
           style: "destructive",
           onPress: () => {
-            if (isLocalUser) {
+            if (data?.localUser ?? false) {
               setShowPasswordModal(true);
             } else {
               deleteAccount({});
@@ -107,279 +134,163 @@ export default function Settings() {
     );
   };
 
-  if (error?.data?.code === "UNAUTHORIZED") {
-    logout();
-  }
-
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingBottom: 40 + headerHeight,
-      }}
-    >
+    <SettingsScreen>
       <UserProfileHeader
         image={data?.image}
         name={data?.name}
         email={data?.email}
       />
 
-      <SectionHeader title="Appearance" />
-      <View
-        className="w-full rounded-xl bg-card py-2"
-        style={{ borderCurve: "continuous" }}
-      >
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Link asChild href="/dashboard/settings/theme" className="flex-1">
-            <Pressable className="flex flex-row items-center">
-              <Text className="mr-2 flex-1" numberOfLines={1}>
-                Theme
-              </Text>
-              <Text className="mr-1 text-muted-foreground" numberOfLines={1}>
-                {
-                  { light: "Light", dark: "Dark", system: "System" }[
-                    settings.theme
-                  ]
-                }
-              </Text>
-              <ChevronRight />
-            </Pressable>
-          </Link>
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Link
-            asChild
-            href="/dashboard/settings/bookmark-default-view"
-            className="flex-1"
-          >
-            <Pressable className="flex flex-row items-center">
-              <Text className="mr-2 flex-1" numberOfLines={1}>
-                Default Bookmark View
-              </Text>
-              {isSettingsLoading ? (
-                <ActivityIndicator size="small" />
-              ) : (
-                <Text className="mr-1 text-muted-foreground" numberOfLines={1}>
-                  {
-                    {
-                      reader: "Reader",
-                      browser: "Browser",
-                      externalBrowser: "External Browser",
-                    }[settings.defaultBookmarkView]
-                  }
-                </Text>
-              )}
-              <ChevronRight />
-            </Pressable>
-          </Link>
-        </View>
-      </View>
+      <SettingsGroup header={t("settings.preferences")}>
+        <SettingsNavigationRow
+          label={t("settings.language")}
+          onPress={() => router.push("/dashboard/settings/language")}
+          value={languageLabel}
+        />
+        <SettingsSeparator />
+        <SettingsNavigationRow
+          label={t("settings.theme")}
+          onPress={() => router.push("/dashboard/settings/theme")}
+          value={themeLabels[settings.theme]}
+        />
+        <SettingsSeparator />
+        <SettingsNavigationRow
+          isLoading={isLoading}
+          label={t("headers.open_bookmarks_in")}
+          onPress={() =>
+            router.push("/dashboard/settings/bookmark-default-view")
+          }
+          value={getBookmarkViewLabels()[settings.defaultBookmarkView]}
+        />
+        <SettingsSeparator />
+        <SettingsNavigationRow
+          label={t("headers.reader_settings")}
+          onPress={() => router.push("/dashboard/settings/reading")}
+        />
+        <SettingsSeparator />
+        <SettingsNavigationRow
+          isLoading={isLoading}
+          label={t("settings.uploads")}
+          onPress={() => router.push("/dashboard/settings/uploads")}
+          value={getTranslatedUploadQualityLabel(settings.imageQuality)}
+        />
+      </SettingsGroup>
 
-      <SectionHeader title="Reading" />
-      <View
-        className="w-full rounded-xl bg-card py-2"
-        style={{ borderCurve: "continuous" }}
-      >
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Link
-            asChild
-            href="/dashboard/settings/reader-settings"
-            className="flex-1"
-          >
-            <Pressable className="flex flex-row items-center">
-              <Text className="mr-2 flex-1" numberOfLines={1}>
-                Reader Text Settings
-              </Text>
-              <ChevronRight />
-            </Pressable>
-          </Link>
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Text className="flex-1" numberOfLines={1}>
-            Show notes in bookmark card
-          </Text>
-          <Switch
-            className="shrink-0"
-            value={settings.showNotes}
-            onValueChange={(value) =>
-              setSettings({
-                ...settings,
-                showNotes: value,
-              })
-            }
-          />
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Link
-            asChild
-            href="/dashboard/settings/toolbar-settings"
-            className="flex-1"
-          >
-            <Pressable className="flex flex-row justify-between">
-              <Text>Toolbar Buttons</Text>
-              <ChevronRight />
-            </Pressable>
-          </Link>
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Text className="flex-1" numberOfLines={1}>
-            Keep screen on while reading
-          </Text>
-          <Switch
-            className="shrink-0"
-            disabled={isSettingsLoading}
-            value={settings.keepScreenOnWhileReading}
-            onValueChange={(value) => {
-              if (isSettingsLoading) return;
-              setSettings({
-                ...settings,
-                keepScreenOnWhileReading: value,
-              });
-            }}
-          />
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between gap-8 px-4 py-1">
-          <Link asChild href="/dashboard/settings/offline" className="flex-1">
-            <Pressable className="flex flex-row items-center">
-              <Text className="mr-2 flex-1" numberOfLines={1}>
-                Offline content
-              </Text>
-              <Text className="mr-1 text-muted-foreground">
-                {offlineLibrary.length}
-              </Text>
-              <ChevronRight />
-            </Pressable>
-          </Link>
-        </View>
-      </View>
+      <SettingsGroup header={t("settings.data")}>
+        <SettingsNavigationRow
+          label={t("settings.downloads")}
+          onPress={() => router.push("/dashboard/settings/offline")}
+          value={String(offlineLibrary.length)}
+        />
+        <SettingsSeparator />
+        <SettingsNavigationRow
+          label={t("settings.statistics")}
+          onPress={() => router.push("/dashboard/settings/usage")}
+        />
+      </SettingsGroup>
 
-      <SectionHeader title="Media" />
-      <View
-        className="w-full rounded-xl bg-card py-2"
-        style={{ borderCurve: "continuous" }}
-      >
-        <View className="flex w-full flex-col gap-1 px-4 py-2">
-          <View className="flex flex-row items-center justify-between">
-            <Text>Upload Image Quality</Text>
-            <Text className="text-foreground">
-              {Math.round(imageQuality ?? 0)}%
-            </Text>
-          </View>
-          {imageQuality === null ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <Slider
-              style={{ height: 40, width: "100%" }}
-              onSlidingComplete={(value) =>
-                setSettings({
-                  ...settings,
-                  imageQuality: Math.round(value) / 100,
-                })
-              }
-              onValueChange={(value) => setImageQuality(value)}
-              value={imageQuality}
-              minimumValue={0}
-              maximumValue={100}
+      {showSubscription ? (
+        <SettingsGroup header={t("settings.account")}>
+          <SettingsNavigationRow
+            label={t("settings.subscription")}
+            onPress={() => router.push("/dashboard/settings/subscription")}
+          />
+        </SettingsGroup>
+      ) : null}
+
+      <SettingsGroup header={t("settings.about")}>
+        <SettingsNavigationRow
+          label={t("headers.server_connection")}
+          value={
+            isLoading
+              ? t("settings.loading_ellipsis")
+              : settings.address?.replace(/^https?:\/\//, "")
+          }
+          onPress={() => router.push("/test-connection")}
+        />
+        <SettingsSeparator />
+        <SettingsValueRow
+          label={t("settings.app_version")}
+          value={Constants.expoConfig?.version ?? t("settings.unknown_version")}
+        />
+        {serverVersion && serverVersion.toLowerCase() !== "unknown" ? (
+          <>
+            <SettingsSeparator />
+            <SettingsValueRow
+              label={t("settings.server_version")}
+              value={serverVersion}
             />
-          )}
-        </View>
-      </View>
+          </>
+        ) : null}
+      </SettingsGroup>
 
-      <SectionHeader title="Library" />
-      <View
-        className="w-full overflow-hidden rounded-xl bg-card"
-        style={{ borderCurve: "continuous" }}
-      >
-        <Link asChild href="/dashboard/settings/usage">
-          <Pressable className="flex flex-row items-center px-4 py-3">
-            <Text className="mr-2 flex-1" numberOfLines={1}>
-              Usage statistics
-            </Text>
-            <ChevronRight />
-          </Pressable>
-        </Link>
-      </View>
+      <SettingsGroup>
+        <SettingsActionRow
+          centered
+          label={t("auth.log_out")}
+          onPress={handleLogout}
+          tone="default"
+        />
+      </SettingsGroup>
 
-      <SectionHeader title="Account" />
-      <View
-        className="w-full rounded-xl bg-card py-2"
-        style={{ borderCurve: "continuous" }}
-      >
-        <Pressable
-          className="flex flex-row items-center px-4 py-1"
-          onPress={logout}
-        >
-          <Text className="flex-1 text-destructive">Log Out</Text>
-        </Pressable>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <Pressable
-          className="flex flex-row items-center px-4 py-1"
-          onPress={handleDeleteAccount}
+      <SettingsGroup>
+        <SettingsActionRow
+          centered
           disabled={isDeleting}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <Text className="flex-1 text-destructive">Delete Account</Text>
-          )}
-        </Pressable>
-      </View>
+          isLoading={isDeleting}
+          label={t("settings.delete_account")}
+          onPress={handleDeleteAccount}
+        />
+      </SettingsGroup>
 
       <Modal
-        visible={showPasswordModal}
-        transparent
         animationType="fade"
-        onRequestClose={() => {
-          setShowPasswordModal(false);
-          setPassword("");
-        }}
+        onRequestClose={closePasswordModal}
+        transparent
+        visible={showPasswordModal}
       >
         <Pressable
-          className="flex-1 items-center justify-center bg-black/50"
-          onPress={() => {
-            setShowPasswordModal(false);
-            setPassword("");
-          }}
+          accessibilityViewIsModal
+          className="flex-1 items-center justify-center bg-black/50 px-8"
+          onPress={closePasswordModal}
         >
-          <Pressable className="mx-8 w-full max-w-sm rounded-2xl bg-card p-6">
-            <Text className="mb-2 text-lg font-bold">Enter Password</Text>
+          <Pressable
+            className="w-full max-w-sm rounded-2xl bg-card p-6"
+            onPress={(event) => event.stopPropagation()}
+            style={{ borderCurve: "continuous" }}
+          >
+            <Text className="mb-2 text-lg font-bold">
+              {t("settings.enter_password")}
+            </Text>
             <Text className="mb-4 text-sm text-muted-foreground">
-              Please enter your password to confirm account deletion.
+              {t("settings.enter_password_hint")}
             </Text>
             <TextInput
+              autoFocus
               className="mb-4 rounded-lg border border-input bg-background px-3 py-2 text-foreground"
-              placeholder="Password"
+              onChangeText={setPassword}
+              placeholder={t("auth.password")}
               secureTextEntry
               value={password}
-              onChangeText={setPassword}
-              autoFocus
             />
-            <View className="flex flex-row justify-end gap-3">
+            <View className="flex-row justify-end gap-3">
               <Pressable
                 className="rounded-lg px-4 py-2"
-                onPress={() => {
-                  setShowPasswordModal(false);
-                  setPassword("");
-                }}
+                onPress={closePasswordModal}
               >
-                <Text className="text-muted-foreground">Cancel</Text>
+                <Text className="text-muted-foreground">{actions.cancel}</Text>
               </Pressable>
               <Pressable
                 className="rounded-lg bg-destructive px-4 py-2"
+                disabled={isDeleting || password.length === 0}
                 onPress={() => deleteAccount({ password })}
-                disabled={isDeleting || !password}
               >
                 {isDeleting ? (
-                  <ActivityIndicator size="small" color="white" />
+                  <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text className="font-medium text-destructive-foreground">
-                    Delete
+                    {t("bookmark_actions.delete")}
                   </Text>
                 )}
               </Pressable>
@@ -387,52 +298,6 @@ export default function Settings() {
           </Pressable>
         </Pressable>
       </Modal>
-
-      <SectionHeader title="About" />
-      <View
-        className="w-full rounded-xl bg-card py-2"
-        style={{ borderCurve: "continuous" }}
-      >
-        <View className="flex flex-row items-center justify-between px-4 py-1">
-          <Text className="text-muted-foreground" numberOfLines={1}>
-            Server
-          </Text>
-          <Text
-            className="flex-1 text-right text-sm text-muted-foreground"
-            numberOfLines={1}
-          >
-            {isSettingsLoading ? "Loading..." : settings.address}
-          </Text>
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between px-4 py-1">
-          <Text className="w-fit text-muted-foreground" numberOfLines={1}>
-            App Version
-          </Text>
-          <Text
-            className="flex-1 text-right text-sm text-muted-foreground"
-            numberOfLines={1}
-          >
-            {Constants.expoConfig?.version ?? "unknown"}
-          </Text>
-        </View>
-        <Divider orientation="horizontal" className="mx-6 my-1" />
-        <View className="flex flex-row items-center justify-between px-4 py-1">
-          <Text className="text-muted-foreground" numberOfLines={1}>
-            Server Version
-          </Text>
-          <Text
-            className="flex-1 text-right text-sm text-muted-foreground"
-            numberOfLines={1}
-          >
-            {isServerVersionLoading
-              ? "Loading..."
-              : serverVersionError
-                ? "unavailable"
-                : (serverVersion ?? "unknown")}
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+    </SettingsScreen>
   );
 }

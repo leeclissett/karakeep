@@ -1,5 +1,4 @@
-import { CallToolResult } from "@modelcontextprotocol/sdk/types";
-
+import { CallToolResult } from "@modelcontextprotocol/server";
 import { KarakeepAPISchemas } from "@karakeep/sdk";
 
 import { turndownService } from "./shared";
@@ -50,7 +49,6 @@ Description: ${list.description ?? ""}
 Parent ID: ${list.parentId ?? ""}
 Query: ${list.query ?? ""}
 Public: ${list.public}
-Pinned: ${list.pinned}
 Has collaborators: ${list.hasCollaborators}
 User role: ${list.userRole}`;
 }

@@ -1,14 +1,19 @@
 import * as React from "react";
-import { Pressable, TextInput, View, ViewStyle } from "react-native";
+import {
+  LayoutChangeEvent,
+  Pressable,
+  TextInput,
+  View,
+  ViewStyle,
+} from "react-native";
 import Animated, {
-  measure,
-  useAnimatedRef,
   useAnimatedStyle,
-  useDerivedValue,
+  useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { TailwindResolver } from "@/components/TailwindResolver";
 import { Text } from "@/components/ui/Text";
+import { useSharedTranslation, useTranslation } from "@/lib/i18n/hooks";
 import { cn } from "@/lib/utils";
 import { useAugmentedRef, useControllableState } from "@rn-primitives/hooks";
 import { SearchIcon } from "lucide-react-native";
@@ -29,8 +34,8 @@ const SearchInput = React.forwardRef<
       value: valueProp,
       onChangeText: onChangeTextProp,
       onFocus: onFocusProp,
-      placeholder = "Search...",
-      cancelText = "Cancel",
+      placeholder: placeholderProp,
+      cancelText: cancelTextProp,
       containerClassName,
       iconContainerClassName,
       className,
@@ -41,12 +46,22 @@ const SearchInput = React.forwardRef<
     ref,
   ) => {
     const inputRef = useAugmentedRef({ ref, methods: { focus, blur, clear } });
+    const { t } = useTranslation();
+    const { t: tShared } = useSharedTranslation();
+    // Default labels are translated; explicit props still win.
+    const placeholder = placeholderProp ?? t("search.placeholder_keyword");
+    const cancelText = cancelTextProp ?? tShared("actions.cancel");
     const [showCancel, setShowCancel] = React.useState(false);
-    const showCancelDerivedValue = useDerivedValue(
-      () => showCancel,
-      [showCancel],
-    );
-    const animatedRef = useAnimatedRef();
+    const cancelButtonWidth = useSharedValue(cancelText.length * 11.2);
+    const cancelButtonVisibility = useSharedValue(0);
+
+    React.useEffect(() => {
+      cancelButtonVisibility.set(withTiming(showCancel ? 1 : 0));
+    }, [cancelButtonVisibility, showCancel]);
+
+    React.useEffect(() => {
+      cancelButtonWidth.set(cancelText.length * 11.2);
+    }, [cancelButtonWidth, cancelText]);
 
     const [value = "", onChangeText] = useControllableState({
       prop: valueProp,
@@ -55,53 +70,28 @@ const SearchInput = React.forwardRef<
     });
 
     const rootStyle = useAnimatedStyle(() => {
-      if (_WORKLET) {
-        // safely use measure
-        const measurement = measure(animatedRef);
-        return {
-          paddingRight: showCancelDerivedValue.value
-            ? withTiming(measurement?.width ?? cancelText.length * 11.2)
-            : withTiming(0),
-        };
-      }
       return {
-        paddingRight: showCancelDerivedValue.value
-          ? withTiming(cancelText.length * 11.2)
-          : withTiming(0),
+        paddingRight: cancelButtonVisibility.get() * cancelButtonWidth.get(),
       };
     });
-    const buttonStyle3 = useAnimatedStyle(() => {
-      if (_WORKLET) {
-        // safely use measure
-        const measurement = measure(animatedRef);
-        return {
-          position: "absolute",
-          right: 0,
-          opacity: showCancelDerivedValue.value ? withTiming(1) : withTiming(0),
-          transform: [
-            {
-              translateX: showCancelDerivedValue.value
-                ? withTiming(0)
-                : measurement?.width
-                  ? withTiming(measurement.width)
-                  : cancelText.length * 11.2,
-            },
-          ],
-        };
-      }
+
+    const buttonStyle = useAnimatedStyle(() => {
+      const visibility = cancelButtonVisibility.get();
       return {
         position: "absolute",
         right: 0,
-        opacity: showCancelDerivedValue.value ? withTiming(1) : withTiming(0),
+        opacity: visibility,
         transform: [
           {
-            translateX: showCancelDerivedValue.value
-              ? withTiming(0)
-              : withTiming(cancelText.length * 11.2),
+            translateX: (1 - visibility) * cancelButtonWidth.get(),
           },
         ],
       };
     });
+
+    function onCancelButtonLayout(event: LayoutChangeEvent) {
+      cancelButtonWidth.set(event.nativeEvent.layout.width);
+    }
 
     function focus() {
       inputRef.current?.focus();
@@ -125,20 +115,20 @@ const SearchInput = React.forwardRef<
         <Animated.View
           style={BORDER_CURVE}
           className={cn(
-            "flex-1 flex-row rounded-lg bg-card",
+            "flex-1 flex-row rounded-full bg-muted/20",
             containerClassName,
           )}
         >
           <View
             className={cn(
-              "absolute bottom-0 left-0 top-0 z-50 justify-center pl-1.5",
+              "absolute bottom-0 left-0 top-0 z-50 justify-center pl-3",
               iconContainerClassName,
             )}
           >
             <TailwindResolver
-              className="text-muted"
+              className="text-muted-foreground"
               comp={(styles) => (
-                <SearchIcon color={styles?.color?.toString()} size={20} />
+                <SearchIcon color={styles?.color?.toString()} size={18} />
               )}
             />
           </View>
@@ -147,7 +137,7 @@ const SearchInput = React.forwardRef<
             placeholder={placeholder}
             className={cn(
               !showCancel && "active:bg-muted/5 dark:active:bg-muted/20",
-              "flex-1 rounded-lg py-2 pl-8 pr-1 text-[17px] text-foreground",
+              "flex-1 rounded-full py-2 pl-9 pr-1 text-[17px] text-foreground placeholder:text-muted-foreground",
               className,
             )}
             value={value}
@@ -159,8 +149,8 @@ const SearchInput = React.forwardRef<
           />
         </Animated.View>
         <Animated.View
-          ref={animatedRef}
-          style={buttonStyle3}
+          onLayout={onCancelButtonLayout}
+          style={buttonStyle}
           pointerEvents={!showCancel ? "none" : "auto"}
         >
           <Pressable

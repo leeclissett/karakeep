@@ -14,6 +14,7 @@ import {
   getApiKeyScope,
 } from "@karakeep/shared/types/apiKeys";
 import serverConfig from "@karakeep/shared/config";
+import { getReadOnlyModeError } from "@karakeep/shared/readOnlyMode";
 
 import { createRateLimitMiddleware } from "./lib/rateLimit";
 import { createTracingMiddleware } from "./lib/tracing";
@@ -38,6 +39,11 @@ export type RequestAuth =
     }
   | {
       type: "session";
+    }
+  | {
+      // Server-initiated calls on behalf of a user (workers, impersonation).
+      // These are exempt from user-facing rate limits.
+      type: "internal";
     }
   | null;
 
@@ -93,10 +99,14 @@ export const createCallerFactory = t.createCallerFactory;
 // Base router and procedure helpers
 export const router = t.router;
 export const procedure = t.procedure
-  .use(function isDemoMode(opts) {
-    if (serverConfig.demoMode && opts.type == "mutation") {
+  .use(function rejectMutationsInReadOnlyModes(opts) {
+    if (opts.type !== "mutation") {
+      return opts.next();
+    }
+    const message = getReadOnlyModeError(serverConfig);
+    if (message) {
       throw new TRPCError({
-        message: "Mutations are not allowed in demo mode",
+        message,
         code: "FORBIDDEN",
       });
     }

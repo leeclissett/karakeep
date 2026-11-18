@@ -1,26 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import Slider from "@react-native-community/slider";
 import {
   ReaderPreview,
   ReaderPreviewRef,
 } from "@/components/reader/ReaderPreview";
-import { Divider } from "@/components/ui/Divider";
+import {
+  SettingsActionRow,
+  SettingsChoiceRow,
+  SettingsGroup,
+  SettingsScreen,
+  SettingsSeparator,
+} from "@/components/settings/settings-list";
 import { Text } from "@/components/ui/Text";
+import { useTranslation } from "@/lib/i18n/hooks";
 import { MOBILE_FONT_FAMILIES, useReaderSettings } from "@/lib/readerSettings";
-import { useColorScheme } from "@/lib/useColorScheme";
-import { Check, RotateCcw } from "lucide-react-native";
 
 import {
-  formatFontFamily,
-  formatFontSize,
   formatLineHeight,
   READER_SETTING_CONSTRAINTS,
 } from "@karakeep/shared/types/readers";
 import { ZReaderFontFamily } from "@karakeep/shared/types/users";
 
 export default function ReaderSettingsPage() {
-  const { isDarkColorScheme: isDark } = useColorScheme();
+  const { t } = useTranslation();
 
   const {
     settings,
@@ -121,106 +124,114 @@ export default function ReaderSettingsPage() {
   const fontFamilyOptions: ZReaderFontFamily[] = ["serif", "sans", "mono"];
 
   return (
-    <ScrollView
-      className="w-full"
-      contentContainerClassName="items-center gap-4 px-4 py-2"
-      contentInsetAdjustmentBehavior="automatic"
-    >
-      {/* Font Family Selection */}
-      <View className="w-full">
-        <Text className="mb-2 px-1 text-sm font-medium text-muted-foreground">
-          Font Family
+    <SettingsScreen>
+      <View className="w-full gap-1.5">
+        <Text variant="footnote" color="tertiary" className="px-4 uppercase">
+          {t("settings.reader_font_family")}
           {localOverrides.fontFamily !== undefined && (
-            <Text className="text-blue-500"> (local)</Text>
+            <Text variant="footnote" className="normal-case text-primary">
+              {" "}
+              · {t("settings.reader_this_device")}
+            </Text>
           )}
         </Text>
-        <View className="w-full rounded-lg bg-card px-4 py-2">
+        <SettingsGroup>
           {fontFamilyOptions.map((fontFamily, index) => {
             const isChecked = effectiveFontFamily === fontFamily;
             return (
               <View key={fontFamily}>
-                <Pressable
+                {index > 0 ? <SettingsSeparator /> : null}
+                <SettingsChoiceRow
+                  label={
+                    fontFamily === "serif"
+                      ? t("settings.reader_font_serif")
+                      : fontFamily === "sans"
+                        ? t("settings.reader_font_sans")
+                        : t("settings.reader_font_mono")
+                  }
+                  labelStyle={{
+                    fontFamily: MOBILE_FONT_FAMILIES[fontFamily],
+                  }}
                   onPress={() => handleFontFamilyChange(fontFamily)}
-                  className="flex flex-row items-center justify-between py-2"
-                >
-                  <Text
-                    style={{
-                      fontFamily: MOBILE_FONT_FAMILIES[fontFamily],
-                    }}
-                  >
-                    {formatFontFamily(fontFamily)}
-                  </Text>
-                  {isChecked && <Check color="rgb(0, 122, 255)" />}
-                </Pressable>
-                {index < fontFamilyOptions.length - 1 && (
-                  <Divider orientation="horizontal" className="h-0.5" />
-                )}
+                  selected={isChecked}
+                />
               </View>
             );
           })}
-        </View>
+        </SettingsGroup>
       </View>
 
-      {/* Font Size */}
-      <View className="w-full">
-        <Text className="mb-2 px-1 text-sm font-medium text-muted-foreground">
-          Font Size ({formatFontSize(displayFontSize)})
+      <View className="w-full gap-1.5">
+        <Text variant="footnote" color="tertiary" className="px-4 uppercase">
+          {t("settings.reader_font_size_value", { size: displayFontSize })}
           {localOverrides.fontSize !== undefined && (
-            <Text className="text-blue-500"> (local)</Text>
+            <Text variant="footnote" className="normal-case text-primary">
+              {" "}
+              · {t("settings.reader_this_device")}
+            </Text>
           )}
         </Text>
-        <View className="flex w-full flex-row items-center gap-3 rounded-lg bg-card px-4 py-3">
-          <Text className="text-muted-foreground">
-            {READER_SETTING_CONSTRAINTS.fontSize.min}
-          </Text>
-          <Slider
-            style={{ height: 40, flex: 1 }}
-            value={displayFontSize}
-            minimumValue={READER_SETTING_CONSTRAINTS.fontSize.min}
-            maximumValue={READER_SETTING_CONSTRAINTS.fontSize.max}
-            onValueChange={(value) => updatePreviewFontSize(Math.round(value))}
-            onSlidingComplete={(value) =>
-              handleFontSizeChange(Math.round(value))
-            }
-          />
-          <Text className="text-muted-foreground">
-            {READER_SETTING_CONSTRAINTS.fontSize.max}
-          </Text>
-        </View>
+        <SettingsGroup>
+          <View className="flex-row items-center gap-3 px-4 py-1">
+            <Text className="text-muted-foreground">
+              {READER_SETTING_CONSTRAINTS.fontSize.min}
+            </Text>
+            <Slider
+              style={{ height: 40, flex: 1 }}
+              value={displayFontSize}
+              minimumValue={READER_SETTING_CONSTRAINTS.fontSize.min}
+              maximumValue={READER_SETTING_CONSTRAINTS.fontSize.max}
+              onValueChange={(value) =>
+                updatePreviewFontSize(Math.round(value))
+              }
+              onSlidingComplete={(value) =>
+                handleFontSizeChange(Math.round(value))
+              }
+            />
+            <Text className="text-muted-foreground">
+              {READER_SETTING_CONSTRAINTS.fontSize.max}
+            </Text>
+          </View>
+        </SettingsGroup>
       </View>
 
-      {/* Line Height */}
-      <View className="w-full">
-        <Text className="mb-2 px-1 text-sm font-medium text-muted-foreground">
-          Line Height ({formatLineHeight(displayLineHeight)})
+      <View className="w-full gap-1.5">
+        <Text variant="footnote" color="tertiary" className="px-4 uppercase">
+          {t("settings.reader_line_height_value", {
+            height: formatLineHeight(displayLineHeight),
+          })}
           {localOverrides.lineHeight !== undefined && (
-            <Text className="text-blue-500"> (local)</Text>
+            <Text variant="footnote" className="normal-case text-primary">
+              {" "}
+              · {t("settings.reader_this_device")}
+            </Text>
           )}
         </Text>
-        <View className="flex w-full flex-row items-center gap-3 rounded-lg bg-card px-4 py-3">
-          <Text className="text-muted-foreground">
-            {READER_SETTING_CONSTRAINTS.lineHeight.min}
-          </Text>
-          <Slider
-            style={{ height: 40, flex: 1 }}
-            value={displayLineHeight}
-            minimumValue={READER_SETTING_CONSTRAINTS.lineHeight.min}
-            maximumValue={READER_SETTING_CONSTRAINTS.lineHeight.max}
-            onValueChange={(value) =>
-              updatePreviewLineHeight(Math.round(value * 10) / 10)
-            }
-            onSlidingComplete={handleLineHeightChange}
-          />
-          <Text className="text-muted-foreground">
-            {READER_SETTING_CONSTRAINTS.lineHeight.max}
-          </Text>
-        </View>
+        <SettingsGroup>
+          <View className="flex-row items-center gap-3 px-4 py-1">
+            <Text className="text-muted-foreground">
+              {READER_SETTING_CONSTRAINTS.lineHeight.min}
+            </Text>
+            <Slider
+              style={{ height: 40, flex: 1 }}
+              value={displayLineHeight}
+              minimumValue={READER_SETTING_CONSTRAINTS.lineHeight.min}
+              maximumValue={READER_SETTING_CONSTRAINTS.lineHeight.max}
+              onValueChange={(value) =>
+                updatePreviewLineHeight(Math.round(value * 10) / 10)
+              }
+              onSlidingComplete={handleLineHeightChange}
+            />
+            <Text className="text-muted-foreground">
+              {READER_SETTING_CONSTRAINTS.lineHeight.max}
+            </Text>
+          </View>
+        </SettingsGroup>
       </View>
 
-      {/* Preview */}
-      <View className="w-full">
-        <Text className="mb-2 px-1 text-sm font-medium text-muted-foreground">
-          Preview
+      <View className="w-full gap-1.5">
+        <Text variant="footnote" color="tertiary" className="px-4 uppercase">
+          {t("settings.reader_preview")}
         </Text>
         <ReaderPreview
           ref={previewRef}
@@ -230,42 +241,37 @@ export default function ReaderSettingsPage() {
         />
       </View>
 
-      <Divider orientation="horizontal" className="my-2 w-full" />
-
-      {/* Save as Default */}
-      <Pressable
-        onPress={handleSaveAsDefault}
-        disabled={!hasLocalOverrides}
-        className="w-full rounded-lg bg-card px-4 py-3"
-      >
-        <Text
-          className={`text-center ${hasLocalOverrides ? "text-blue-500" : "text-muted-foreground"}`}
-        >
-          Save as Default (All Devices)
-        </Text>
-      </Pressable>
-
-      {/* Clear Local */}
-      {hasLocalOverrides && (
-        <Pressable
-          onPress={handleClearLocalOverrides}
-          className="flex w-full flex-row items-center justify-center gap-2 rounded-lg bg-card px-4 py-3"
-        >
-          <RotateCcw size={16} color={isDark ? "#9ca3af" : "#6b7280"} />
-          <Text className="text-muted-foreground">Clear Local Overrides</Text>
-        </Pressable>
-      )}
-
-      {/* Clear Server */}
-      {hasServerDefaults && (
-        <Pressable
-          onPress={handleClearServerDefaults}
-          className="flex w-full flex-row items-center justify-center gap-2 rounded-lg bg-card px-4 py-3"
-        >
-          <RotateCcw size={16} color={isDark ? "#9ca3af" : "#6b7280"} />
-          <Text className="text-muted-foreground">Clear Server Defaults</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+      <SettingsGroup>
+        <SettingsActionRow
+          centered
+          disabled={!hasLocalOverrides}
+          label={t("settings.reader_save_default_all_devices")}
+          onPress={handleSaveAsDefault}
+          tone="primary"
+        />
+        {hasLocalOverrides ? (
+          <>
+            <SettingsSeparator />
+            <SettingsActionRow
+              centered
+              label={t("settings.reader_reset_this_device")}
+              onPress={handleClearLocalOverrides}
+              tone="primary"
+            />
+          </>
+        ) : null}
+        {hasServerDefaults ? (
+          <>
+            <SettingsSeparator />
+            <SettingsActionRow
+              centered
+              label={t("settings.reader_reset_all_devices")}
+              onPress={handleClearServerDefaults}
+              tone="primary"
+            />
+          </>
+        ) : null}
+      </SettingsGroup>
+    </SettingsScreen>
   );
 }

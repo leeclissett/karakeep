@@ -26,9 +26,10 @@ import {
   OpenAIQueue,
   QueuePriority,
   QuotaService,
+  SUPPORTED_BOOKMARK_ASSET_TYPES,
   triggerSearchReindex,
+  VideoWorkerQueue,
 } from "@karakeep/shared-server";
-import { SUPPORTED_BOOKMARK_ASSET_TYPES } from "@karakeep/shared/assetdb";
 import serverConfig from "@karakeep/shared/config";
 import {
   EmbeddingClientFactory,
@@ -40,6 +41,7 @@ import { EnqueueOptions } from "@karakeep/shared/queueing";
 import { getRateLimitClient } from "@karakeep/shared/ratelimiting";
 import { FilterQuery, getSearchClient } from "@karakeep/shared/search";
 import { parseSearchQuery } from "@karakeep/shared/searchQueryParser";
+import { buildSummarizationInput } from "@karakeep/shared/summarization";
 import type {
   ZBookmarkContent,
   ZBookmarkSource,
@@ -329,10 +331,27 @@ export const bookmarksAppRouter = router({
         }
       }
 
+      if (input.type === BookmarkTypes.LINK && input.precrawledArchiveId) {
+        await Asset.ensureOwnership(ctx, input.precrawledArchiveId);
+      }
+      if (input.type === BookmarkTypes.ASSET) {
+        const uploadedAsset = await Asset.fromId(ctx, input.assetId);
+        uploadedAsset.ensureOwnership();
+        if (
+          !uploadedAsset.asset.contentType ||
+          !SUPPORTED_BOOKMARK_ASSET_TYPES.has(uploadedAsset.asset.contentType)
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Unsupported asset type",
+          });
+        }
+      }
+
       const bookmark = await ctx.db.transaction(
-        async (tx) => {
+        (tx) => {
           // Check user quota
-          const quotaResult = await QuotaService.canCreateBookmark(
+          const quotaResult = QuotaService.canCreateBookmarkInTransaction(
             tx,
             ctx.user.id,
           );
@@ -342,43 +361,42 @@ export const bookmarksAppRouter = router({
               message: quotaResult.error,
             });
           }
-          const bookmark = (
-            await tx
-              .insert(bookmarks)
-              .values({
-                userId: ctx.user.id,
-                title: input.title,
-                type: input.type,
-                archived: input.archived,
-                favourited: input.favourited,
-                note: input.note,
-                summary: input.summary,
-                createdAt: input.createdAt,
-                source: input.source,
-                // Only links currently support summarization. Let's set the status to null for other types for now.
-                summarizationStatus:
-                  input.type === BookmarkTypes.LINK ? "pending" : null,
-              })
-              .returning()
-          )[0];
+          const bookmark = tx
+            .insert(bookmarks)
+            .values({
+              userId: ctx.user.id,
+              title: input.title,
+              type: input.type,
+              archived: input.archived,
+              favourited: input.favourited,
+              note: input.note,
+              summary: input.summary,
+              createdAt: input.createdAt,
+              source: input.source,
+              // Every type now ends up with a summarization job: links and
+              // texts enqueue one as part of this request, assets once
+              // preprocessing has extracted their text. The asset preprocessing
+              // worker already clears this back to null if it gives up before
+              // enqueueing one.
+              summarizationStatus: "pending",
+            })
+            .returning()
+            .all()[0];
 
           let content: ZBookmarkContent;
 
           switch (input.type) {
             case BookmarkTypes.LINK: {
-              const link = (
-                await tx
-                  .insert(bookmarkLinks)
-                  .values({
-                    id: bookmark.id,
-                    url: input.url.trim(),
-                  })
-                  .returning()
-              )[0];
+              const link = tx
+                .insert(bookmarkLinks)
+                .values({
+                  id: bookmark.id,
+                  url: input.url.trim(),
+                })
+                .returning()
+                .all()[0];
               if (input.precrawledArchiveId) {
-                await Asset.ensureOwnership(ctx, input.precrawledArchiveId);
-                await tx
-                  .update(assets)
+                tx.update(assets)
                   .set({
                     bookmarkId: bookmark.id,
                     assetType: AssetTypes.LINK_PRECRAWLED_ARCHIVE,
@@ -388,7 +406,8 @@ export const bookmarksAppRouter = router({
                       eq(assets.id, input.precrawledArchiveId),
                       eq(assets.userId, ctx.user.id),
                     ),
-                  );
+                  )
+                  .run();
               }
               content = {
                 type: BookmarkTypes.LINK,
@@ -397,16 +416,15 @@ export const bookmarksAppRouter = router({
               break;
             }
             case BookmarkTypes.TEXT: {
-              const text = (
-                await tx
-                  .insert(bookmarkTexts)
-                  .values({
-                    id: bookmark.id,
-                    text: input.text,
-                    sourceUrl: input.sourceUrl,
-                  })
-                  .returning()
-              )[0];
+              const text = tx
+                .insert(bookmarkTexts)
+                .values({
+                  id: bookmark.id,
+                  text: input.text,
+                  sourceUrl: input.sourceUrl,
+                })
+                .returning()
+                .all()[0];
               content = {
                 type: BookmarkTypes.TEXT,
                 text: text.text ?? "",
@@ -415,7 +433,7 @@ export const bookmarksAppRouter = router({
               break;
             }
             case BookmarkTypes.ASSET: {
-              const [asset] = await tx
+              const [asset] = tx
                 .insert(bookmarkAssets)
                 .values({
                   id: bookmark.id,
@@ -426,22 +444,9 @@ export const bookmarksAppRouter = router({
                   fileName: input.fileName ?? null,
                   sourceUrl: input.sourceUrl ?? null,
                 })
-                .returning();
-              const uploadedAsset = await Asset.fromId(ctx, input.assetId);
-              uploadedAsset.ensureOwnership();
-              if (
-                !uploadedAsset.asset.contentType ||
-                !SUPPORTED_BOOKMARK_ASSET_TYPES.has(
-                  uploadedAsset.asset.contentType,
-                )
-              ) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "Unsupported asset type",
-                });
-              }
-              await tx
-                .update(assets)
+                .returning()
+                .all();
+              tx.update(assets)
                 .set({
                   bookmarkId: bookmark.id,
                   assetType: AssetTypes.BOOKMARK_ASSET,
@@ -451,7 +456,8 @@ export const bookmarksAppRouter = router({
                     eq(assets.id, input.assetId),
                     eq(assets.userId, ctx.user.id),
                   ),
-                );
+                )
+                .run();
               content = {
                 type: BookmarkTypes.ASSET,
                 assetType: asset.assetType,
@@ -528,6 +534,13 @@ export const bookmarksAppRouter = router({
               enqueueOpts,
             );
           }
+          await OpenAIQueue.enqueue(
+            {
+              bookmarkId: bookmark.id,
+              type: "summarize",
+            },
+            enqueueOpts,
+          );
           break;
         }
         case BookmarkTypes.ASSET: {
@@ -570,7 +583,7 @@ export const bookmarksAppRouter = router({
     .output(zBookmarkSchema)
     .use(ensureBookmarkOwnership)
     .mutation(async ({ input, ctx }) => {
-      await ctx.db.transaction(async (tx) => {
+      await ctx.db.transaction((tx) => {
         let somethingChanged = false;
 
         // Update link-specific fields if any are provided
@@ -602,10 +615,11 @@ export const bookmarksAppRouter = router({
         }
 
         if (Object.keys(linkUpdateData).length > 0) {
-          const result = await tx
+          const result = tx
             .update(bookmarkLinks)
             .set(linkUpdateData)
-            .where(eq(bookmarkLinks.id, input.bookmarkId));
+            .where(eq(bookmarkLinks.id, input.bookmarkId))
+            .run();
           if (result.changes == 0) {
             throw new TRPCError({
               code: "BAD_REQUEST",
@@ -617,12 +631,13 @@ export const bookmarksAppRouter = router({
         }
 
         if (input.text) {
-          const result = await tx
+          const result = tx
             .update(bookmarkTexts)
             .set({
               text: input.text,
             })
-            .where(eq(bookmarkTexts.id, input.bookmarkId));
+            .where(eq(bookmarkTexts.id, input.bookmarkId))
+            .run();
 
           if (result.changes == 0) {
             throw new TRPCError({
@@ -635,12 +650,13 @@ export const bookmarksAppRouter = router({
         }
 
         if (input.assetContent !== undefined) {
-          const result = await tx
+          const result = tx
             .update(bookmarkAssets)
             .set({
               content: input.assetContent,
             })
-            .where(and(eq(bookmarkAssets.id, input.bookmarkId)));
+            .where(and(eq(bookmarkAssets.id, input.bookmarkId)))
+            .run();
 
           if (result.changes == 0) {
             throw new TRPCError({
@@ -684,15 +700,15 @@ export const bookmarksAppRouter = router({
         }
 
         if (Object.keys(commonUpdateData).length > 1 || somethingChanged) {
-          await tx
-            .update(bookmarks)
+          tx.update(bookmarks)
             .set(commonUpdateData)
             .where(
               and(
                 eq(bookmarks.userId, ctx.user.id),
                 eq(bookmarks.id, input.bookmarkId),
               ),
-            );
+            )
+            .run();
         }
       });
 
@@ -763,29 +779,30 @@ export const bookmarksAppRouter = router({
     )
     .use(ensureBookmarkOwnership)
     .mutation(async ({ input, ctx }) => {
-      await ctx.db.transaction(async (tx) => {
-        const res = await tx
+      await ctx.db.transaction((tx) => {
+        const res = tx
           .update(bookmarkTexts)
           .set({
             text: input.text,
           })
           .where(and(eq(bookmarkTexts.id, input.bookmarkId)))
-          .returning();
+          .returning()
+          .all();
         if (res.length == 0) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Bookmark not found",
           });
         }
-        await tx
-          .update(bookmarks)
+        tx.update(bookmarks)
           .set({ modifiedAt: new Date() })
           .where(
             and(
               eq(bookmarks.id, input.bookmarkId),
               eq(bookmarks.userId, ctx.user.id),
             ),
-          );
+          )
+          .run();
       });
       await Promise.all([
         triggerSearchReindex(input.bookmarkId, {
@@ -838,6 +855,101 @@ export const bookmarksAppRouter = router({
         priority: QueuePriority.Low,
         idempotencyKey: buildCrawlIdempotencyKey(payload),
       });
+      ctx.db.transaction((tx) => {
+        tx.update(bookmarkLinks)
+          .set({ crawlStatus: "pending" })
+          .where(eq(bookmarkLinks.id, input.bookmarkId))
+          .run();
+        // Clients poll a bookmark that's still loading, backing off from when
+        // it was last modified, so the bookmark's own row has to change too.
+        tx.update(bookmarks)
+          .set({ modifiedAt: new Date() })
+          .where(eq(bookmarks.id, input.bookmarkId))
+          .run();
+      });
+    }),
+  // Captures an offline copy (a PDF or a full-page archive) of a link without
+  // recrawling it: the bookmark's content, metadata and crawl status are kept.
+  preserveOfflineCopy: bookmarksProcedure
+    .use(
+      createRateLimitMiddleware({
+        name: "bookmarks.preserveOfflineCopy",
+        windowMs: 30 * 60 * 1000,
+        maxRequests: 200,
+      }),
+    )
+    .input(
+      z.object({
+        bookmarkId: z.string(),
+        kind: z.enum(["fullPageArchive", "pdf"]),
+      }),
+    )
+    .use(ensureBookmarkOwnership)
+    .mutation(async ({ input, ctx }) => {
+      const link = await ctx.db.query.bookmarkLinks.findFirst({
+        where: eq(bookmarkLinks.id, input.bookmarkId),
+        columns: { id: true },
+      });
+      if (!link) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Offline copies can only be preserved for link bookmarks",
+        });
+      }
+      const payload = {
+        bookmarkId: input.bookmarkId,
+        archiveFullPage: input.kind === "fullPageArchive",
+        storePdf: input.kind === "pdf",
+        offlineCopiesOnly: true,
+      };
+      await LowPriorityCrawlerQueue.enqueue(payload, {
+        groupId: ctx.user.id,
+        priority: QueuePriority.Low,
+        idempotencyKey: buildCrawlIdempotencyKey(payload),
+      });
+    }),
+  preserveVideo: bookmarksProcedure
+    .use(
+      createRateLimitMiddleware({
+        name: "bookmarks.preserveVideo",
+        windowMs: 30 * 60 * 1000,
+        maxRequests: 50,
+      }),
+    )
+    .input(
+      z.object({
+        bookmarkId: z.string(),
+      }),
+    )
+    .use(ensureBookmarkOwnership)
+    .mutation(async ({ input, ctx }) => {
+      if (!serverConfig.crawler.downloadVideoOnDemand) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "On-demand video downloads are disabled on this server",
+        });
+      }
+      const link = await ctx.db.query.bookmarkLinks.findFirst({
+        where: eq(bookmarkLinks.id, input.bookmarkId),
+        columns: { url: true },
+      });
+      if (!link) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Videos can only be preserved for link bookmarks",
+        });
+      }
+      await VideoWorkerQueue.enqueue(
+        {
+          bookmarkId: input.bookmarkId,
+          url: link.url,
+          onDemand: true,
+        },
+        {
+          groupId: ctx.user.id,
+          idempotencyKey: `video:${input.bookmarkId}`,
+        },
+      );
     }),
   updateReadingProgress: bookmarksProcedure
     .input(
@@ -1344,24 +1456,25 @@ export const bookmarksAppRouter = router({
       const allIdsToAttach = attachTagsWithNames.map((t) => t.id);
       const idsToRemove = detachTagsWithNames.map((t) => t.id);
 
-      const res = await ctx.db.transaction(async (tx) => {
+      const res = await ctx.db.transaction((tx) => {
         let numChanges = 0;
         // Detaches
         if (idsToRemove.length > 0) {
-          const res = await tx
+          const res = tx
             .delete(tagsOnBookmarks)
             .where(
               and(
                 eq(tagsOnBookmarks.bookmarkId, input.bookmarkId),
                 inArray(tagsOnBookmarks.tagId, idsToRemove),
               ),
-            );
+            )
+            .run();
           numChanges += res.changes;
         }
 
         // Attach tags
         if (allIdsToAttach.length > 0) {
-          const res = await tx
+          const res = tx
             .insert(tagsOnBookmarks)
             .values(
               allIdsToAttach.map((i) => ({
@@ -1370,21 +1483,22 @@ export const bookmarksAppRouter = router({
                 attachedBy: tagIdToAttachedBy.get(i) ?? "human",
               })),
             )
-            .onConflictDoNothing();
+            .onConflictDoNothing()
+            .run();
           numChanges += res.changes;
         }
 
         // Update bookmark modified timestamp
         if (numChanges > 0) {
-          await tx
-            .update(bookmarks)
+          tx.update(bookmarks)
             .set({ modifiedAt: new Date() })
             .where(
               and(
                 eq(bookmarks.id, input.bookmarkId),
                 eq(bookmarks.userId, ctx.user.id),
               ),
-            );
+            )
+            .run();
         }
 
         return {
@@ -1435,6 +1549,8 @@ export const bookmarksAppRouter = router({
           z.object({
             id: z.string(),
             url: z.string(),
+            title: z.string().nullable(),
+            isCrawling: z.boolean(),
             statusCode: z.number().nullable(),
             isCrawlingFailure: z.boolean(),
             crawledAt: z.date().nullable(),
@@ -1448,6 +1564,8 @@ export const bookmarksAppRouter = router({
         .select({
           id: bookmarkLinks.id,
           url: bookmarkLinks.url,
+          userTitle: bookmarks.title,
+          linkTitle: bookmarkLinks.title,
           crawlStatusCode: bookmarkLinks.crawlStatusCode,
           crawlingStatus: bookmarkLinks.crawlStatus,
           crawledAt: bookmarkLinks.crawledAt,
@@ -1469,6 +1587,8 @@ export const bookmarksAppRouter = router({
         bookmarks: brokenLinkBookmarks.map((b) => ({
           id: b.id,
           url: b.url,
+          title: b.userTitle || b.linkTitle || null,
+          isCrawling: b.crawlingStatus === "pending",
           statusCode: b.crawlStatusCode,
           isCrawlingFailure: b.crawlingStatus === "failure",
           crawledAt: b.crawledAt,
@@ -1508,29 +1628,63 @@ export const bookmarksAppRouter = router({
           message: "No inference client configured",
         });
       }
-      const bookmark = await ctx.db.query.bookmarkLinks.findFirst({
-        where: eq(bookmarkLinks.id, input.bookmarkId),
+      const bookmark = await ctx.db.query.bookmarks.findFirst({
+        where: eq(bookmarks.id, input.bookmarkId),
+        columns: { type: true },
+        with: {
+          link: {
+            columns: {
+              title: true,
+              description: true,
+              htmlContent: true,
+              contentAssetId: true,
+              publisher: true,
+              author: true,
+              url: true,
+            },
+          },
+          text: {
+            columns: {
+              text: true,
+            },
+          },
+          asset: {
+            columns: {
+              content: true,
+              fileName: true,
+            },
+          },
+        },
       });
 
       if (!bookmark) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Bookmark not found or not a link",
+          message: "Bookmark not found",
         });
       }
 
-      const content = await Bookmark.getBookmarkPlainTextContent(
+      // Extracting the plain text content of a link hits the asset store, so
+      // it's only resolved for the bookmark type that needs it.
+      const linkPlainTextContent =
+        bookmark.type === BookmarkTypes.LINK && bookmark.link
+          ? ((await Bookmark.getBookmarkPlainTextContent(
+              bookmark.link,
+              ctx.user.id,
+            )) ?? "")
+          : "";
+
+      const bookmarkDetails = buildSummarizationInput(
         bookmark,
-        ctx.user.id,
+        linkPlainTextContent,
       );
 
-      const bookmarkDetails = `
-Title: ${bookmark.title ?? ""}
-Description: ${bookmark.description ?? ""}
-Content: ${content}
-Publisher: ${bookmark.publisher ?? ""}
-Author: ${bookmark.author ?? ""}
-`;
+      if (!bookmarkDetails) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Nothing to summarize for this bookmark",
+        });
+      }
 
       const prompts = await ctx.db.query.customPrompts.findMany({
         where: and(
@@ -1584,6 +1738,7 @@ Author: ${bookmark.author ?? ""}
         .update(bookmarks)
         .set({
           summary: summary.response,
+          summarizationStatus: "success",
         })
         .where(eq(bookmarks.id, input.bookmarkId));
       await Promise.all([

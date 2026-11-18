@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import SidebarItem from "@/components/shared/sidebar/SidebarItem";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import { toast } from "@/components/ui/sonner";
 import { BOOKMARK_DRAG_MIME } from "@/lib/bookmark-drag";
 import { useTranslation } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 import type { ZBookmarkList } from "@karakeep/shared/types/lists";
@@ -23,11 +21,7 @@ import {
   useAddBookmarkToList,
   useBookmarkLists,
 } from "@karakeep/shared-react/hooks/lists";
-import { useTRPC } from "@karakeep/shared-react/trpc";
-import {
-  getPinnedLists,
-  ZBookmarkListTreeNode,
-} from "@karakeep/shared/utils/listUtils";
+import { ZBookmarkListTreeNode } from "@karakeep/shared/utils/listUtils";
 
 import { CollapsibleBookmarkLists } from "../lists/CollapsibleBookmarkLists";
 import { EditListModal } from "../lists/EditListModal";
@@ -108,6 +102,7 @@ function DroppableListSidebarItem({
   selectedListId: string | null;
   setSelectedListId: (id: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const canDrop =
     node.item.type === "manual" &&
     (node.item.userRole === "owner" || node.item.userRole === "editor");
@@ -118,7 +113,11 @@ function DroppableListSidebarItem({
     <SidebarItem
       collapseButton={
         node.children.length > 0 ? (
-          <CollapsibleTriggerChevron className="size-4" open={open} />
+          <CollapsibleTriggerChevron
+            className="size-4"
+            open={open}
+            aria-label={t(open ? "actions.collapse" : "actions.expand")}
+          />
         ) : (
           <span className="size-4" />
         )
@@ -142,7 +141,12 @@ function DroppableListSidebarItem({
           }}
           list={node.item}
         >
-          <Button size="none" variant="ghost" className="relative">
+          <Button
+            size="none"
+            variant="ghost"
+            className="relative"
+            aria-label={t("actions.more_options")}
+          >
             <MoreHorizontal
               className={cn(
                 "absolute inset-0 m-auto size-4 opacity-0 transition-opacity duration-100 group-hover:opacity-100",
@@ -196,15 +200,6 @@ export default function AllLists({
     initialData.lists,
   );
 
-  const api = useTRPC();
-  const { data: listStats } = useQuery(
-    api.lists.stats.queryOptions(undefined, {
-      placeholderData: keepPreviousData,
-    }),
-  );
-
-  const pinnedLists = useMemo(() => getPinnedLists(lists.data), [lists.data]);
-
   // Check if any shared list is currently being viewed
   const isViewingSharedList = useMemo(() => {
     return lists.data.some(
@@ -233,12 +228,12 @@ export default function AllLists({
           Lists
         </p>
         <EditListModal>
-          <Link href="#">
+          <button type="button" aria-label={t("lists.new_list")}>
             <Plus
               className="mr-2 size-4 text-muted-foreground"
               strokeWidth={1.5}
             />
-          </Link>
+          </button>
         </EditListModal>
       </li>
       <SidebarItem
@@ -256,18 +251,6 @@ export default function AllLists({
         path={`/dashboard/favourites`}
         linkClassName="py-0.5 px-1"
       />
-
-      {pinnedLists.map((list) => (
-        <DroppableListSidebarItem
-          key={list.id}
-          node={{ item: list, children: [] }}
-          level={0}
-          open={false}
-          numBookmarks={listStats?.stats.get(list.id)}
-          selectedListId={selectedListId}
-          setSelectedListId={setSelectedListId}
-        />
-      ))}
 
       {/* Owned Lists */}
       <CollapsibleBookmarkLists
@@ -294,6 +277,9 @@ export default function AllLists({
               <CollapsibleTriggerChevron
                 className="size-4"
                 open={sharedListsOpen}
+                aria-label={t(
+                  sharedListsOpen ? "actions.collapse" : "actions.expand",
+                )}
               />
             }
             logo={<span className="text-lg">👥</span>}

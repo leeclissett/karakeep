@@ -1,15 +1,21 @@
-import { Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
-import { Divider } from "@/components/ui/Divider";
-import { Text } from "@/components/ui/Text";
+import {
+  SettingsChoiceRow,
+  SettingsGroup,
+  SettingsScreen,
+  SettingsSeparator,
+} from "@/components/settings/settings-list";
 import { useToast } from "@/components/ui/Toast";
+import { useCommonStrings, useTranslation } from "@/lib/i18n/hooks";
 import useAppSettings from "@/lib/settings";
-import { Check } from "lucide-react-native";
 
 export default function BookmarkDefaultViewSettings() {
   const router = useRouter();
   const { toast } = useToast();
   const { settings, setSettings } = useAppSettings();
+  const { t } = useTranslation();
+  const strings = useCommonStrings();
 
   const handleUpdate = async (
     mode: "reader" | "browser" | "externalBrowser",
@@ -20,56 +26,41 @@ export default function BookmarkDefaultViewSettings() {
         defaultBookmarkView: mode,
       });
       toast({
-        message: "Default Bookmark View updated!",
+        message: t("settings.open_in_updated"),
         showProgress: false,
       });
       router.back();
     } catch {
       toast({
-        message: "Something went wrong",
+        message: strings.somethingWentWrong,
         variant: "destructive",
         showProgress: false,
       });
     }
   };
 
-  const options = (["reader", "browser", "externalBrowser"] as const)
-    .map((mode) => {
-      const currentMode = settings.defaultBookmarkView;
-      const isChecked = currentMode === mode;
-      return [
-        <Pressable
-          onPress={() => handleUpdate(mode)}
-          className="flex flex-row items-center justify-between"
-          key={mode}
-        >
-          <Text className="mr-2 flex-1" numberOfLines={1}>
-            {
-              {
-                browser: "Browser",
-                reader: "Reader",
-                externalBrowser: "External Browser",
-              }[mode]
-            }
-          </Text>
-          {isChecked && <Check color="rgb(0, 122, 255)" />}
-        </Pressable>,
-        <Divider
-          key={mode + "-divider"}
-          orientation="horizontal"
-          className="my-3 h-0.5 w-full"
-        />,
-      ];
-    })
-    .flat();
-  options.pop();
+  const modes = ["reader", "browser", "externalBrowser"] as const;
 
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerClassName="flex w-full items-center px-4 py-2"
-    >
-      <View className="w-full rounded-lg bg-card px-4 py-2">{options}</View>
-    </ScrollView>
+    <SettingsScreen>
+      <SettingsGroup footer={t("settings.open_in_hint")}>
+        {modes.map((mode, index) => (
+          <View key={mode}>
+            {index > 0 ? <SettingsSeparator /> : null}
+            <SettingsChoiceRow
+              label={
+                {
+                  browser: t("settings.open_in_browser"),
+                  externalBrowser: t("settings.open_in_external"),
+                  reader: t("settings.open_in_reader"),
+                }[mode]
+              }
+              onPress={() => void handleUpdate(mode)}
+              selected={settings.defaultBookmarkView === mode}
+            />
+          </View>
+        ))}
+      </SettingsGroup>
+    </SettingsScreen>
   );
 }

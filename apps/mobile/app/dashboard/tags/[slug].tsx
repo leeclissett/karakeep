@@ -1,15 +1,27 @@
-import { Stack, useLocalSearchParams } from "expo-router";
-import BookmarkListHeader from "@/components/bookmarks/BookmarkListHeader";
+import { Alert, Platform, View, Pressable } from "react-native";
+import * as Haptics from "expo-haptics";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { useBookmarkListLayoutMenu } from "@/components/bookmarks/BookmarkListHeader";
 import UpdatingBookmarkList from "@/components/bookmarks/UpdatingBookmarkList";
 import QueryPageState from "@/components/QueryPageState";
 import FullPageSpinner from "@/components/ui/FullPageSpinner";
+import { useToast } from "@/components/ui/Toast";
+import { useCommonActions, useTranslation } from "@/lib/i18n/hooks";
 import { useArchiveFilter } from "@/lib/hooks";
+import { useColorScheme } from "@/lib/useColorScheme";
+import { inlineMenuGroup } from "@/lib/menuGroups";
+import { useMenuIconColors } from "@/lib/useMenuIconColors";
+import { MenuView } from "@react-native-menu/menu";
 import { useQuery } from "@tanstack/react-query";
+import { Ellipsis } from "lucide-react-native";
 
+import { useDeleteTag } from "@karakeep/shared-react/hooks/tags";
 import { useTRPC } from "@karakeep/shared-react/trpc";
 
 export default function TagView() {
   const { slug } = useLocalSearchParams();
+  const { t } = useTranslation();
   const api = useTRPC();
   if (typeof slug !== "string") {
     throw new Error("Unexpected param type");
@@ -27,8 +39,9 @@ export default function TagView() {
       <Stack.Screen
         options={{
           headerTitle: tag?.name ?? "",
-          headerBackTitle: "Back",
-          headerRight: () => <BookmarkListHeader />,
+          headerBackTitle: t("app.back"),
+          headerRight: () =>
+            tag ? <TagActionsMenu tagId={tag.id} tagName={tag.name} /> : null,
         }}
       />
       {!tag ? (
@@ -44,5 +57,104 @@ export default function TagView() {
         <FullPageSpinner />
       )}
     </>
+  );
+}
+
+function TagActionsMenu({
+  tagId,
+  tagName,
+}: {
+  tagId: string;
+  tagName: string;
+}) {
+  const { colors } = useColorScheme();
+  const { menuIconColor, destructiveMenuIconColor } = useMenuIconColors();
+  const { layoutActions, handleLayoutAction } = useBookmarkListLayoutMenu();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const actions = useCommonActions();
+  const { mutate: deleteTag } = useDeleteTag({
+    onSuccess: () => {
+      router.dismissTo("/dashboard/(tabs)/(tags)");
+      toast({
+        message: t("tags.deleted", { name: tagName }),
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({ message: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDelete = () => {
+    Alert.alert(
+      t("tags.delete_title"),
+      t("tags.delete_message", { name: tagName }),
+      [
+        { text: actions.cancel, style: "cancel" },
+        {
+          text: t("bookmark_actions.delete"),
+          onPress: () => deleteTag({ tagId }),
+          style: "destructive",
+        },
+      ],
+    );
+  };
+
+  const handleEdit = () => {
+    router.push({
+      pathname: "/dashboard/tags/[slug]/edit",
+      params: { slug: tagId },
+    });
+  };
+
+  return (
+    <MenuView
+      actions={[
+        ...inlineMenuGroup("edit-group", [
+          {
+            id: "edit",
+            title: t("tags.edit_tag"),
+            image: Platform.select({ ios: "square.and.pencil" }),
+            imageColor: Platform.select({ ios: menuIconColor }),
+          },
+        ]),
+        // The menu library drops a third level of nesting, so these submenus
+        // can't sit in an inline group. Group their neighbours instead.
+        ...layoutActions,
+        ...inlineMenuGroup("danger-group", [
+          {
+            id: "delete_tag",
+            title: t("tags.delete_title"),
+            attributes: { destructive: true },
+            image: Platform.select({ ios: "trash" }),
+            imageColor: Platform.select({ ios: destructiveMenuIconColor }),
+          },
+        ]),
+      ]}
+      onPressAction={({ nativeEvent }) => {
+        if (handleLayoutAction(nativeEvent.event)) {
+          return;
+        }
+
+        if (nativeEvent.event === "delete_tag") {
+          handleDelete();
+        } else if (nativeEvent.event === "edit") {
+          handleEdit();
+        }
+      }}
+      shouldOpenOnLongPress={false}
+    >
+      <View className="my-auto">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("tags.tag_actions")}
+          hitSlop={8}
+          onPress={() => void Haptics.selectionAsync()}
+        >
+          <AppIcon icon={Ellipsis} size={21} color={colors.foreground} />
+        </Pressable>
+      </View>
+    </MenuView>
   );
 }

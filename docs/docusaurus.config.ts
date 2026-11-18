@@ -4,12 +4,12 @@ import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
-  title: "Karakeep Docs",
-  tagline: "Dinosaurs are cool",
+  title: "Karakeep",
+  tagline: "The bookmark everything app",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
-  url: "https://docs.karakeep.app",
+  url: "https://docs.karakeep.com",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: "/",
@@ -50,6 +50,11 @@ const config: Config = {
           docItemComponent: "@theme/ApiItem",
         },
         blog: false,
+        sitemap: {
+          // Old versions and the unreleased docs are blocked in robots.txt,
+          // so don't advertise them to crawlers either.
+          ignorePatterns: ["/v[0-9]*/**", "/next/**"],
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
@@ -96,7 +101,7 @@ const config: Config = {
           position: "right",
         },
         {
-          href: "https://karakeep.app",
+          href: "https://karakeep.com",
           label: "Homepage",
           position: "right",
         },

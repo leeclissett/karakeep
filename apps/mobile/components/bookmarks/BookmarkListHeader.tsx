@@ -1,8 +1,11 @@
 import { Platform, View } from "react-native";
 import { MenuAction, MenuView } from "@react-native-menu/menu";
-import { MoreHorizontal } from "lucide-react-native";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { SlidersHorizontal } from "lucide-react-native";
 
+import { useTranslation } from "@/lib/i18n/hooks";
 import useAppSettings from "@/lib/settings";
+import { useColorScheme } from "@/lib/useColorScheme";
 import { useMenuIconColors } from "@/lib/useMenuIconColors";
 
 function useBookmarkListLayoutMenu(): {
@@ -11,47 +14,58 @@ function useBookmarkListLayoutMenu(): {
   menuIconColor: string;
 } {
   const { settings, setSettings } = useAppSettings();
+  const { t } = useTranslation();
   const { menuIconColor } = useMenuIconColors();
+
+  const layoutModeActions: MenuAction[] = [
+    {
+      id: "card",
+      title: t("bookmarks.layout_expanded"),
+      state: settings.bookmarkLayout === "card" ? "on" : "off",
+      image: Platform.select({ ios: "rectangle.grid.1x2" }),
+      imageColor: Platform.select({ ios: menuIconColor }),
+    },
+    {
+      id: "list",
+      title: t("bookmarks.layout_compact"),
+      state: settings.bookmarkLayout === "list" ? "on" : "off",
+      image: Platform.select({ ios: "list.bullet" }),
+      imageColor: Platform.select({ ios: menuIconColor }),
+    },
+  ];
+  const showNotesAction: MenuAction = {
+    id: "show_notes",
+    title: t("bookmarks.show_notes"),
+    state: settings.showNotes ? "on" : "off",
+    image: Platform.select({ ios: "note.text" }),
+    imageColor: Platform.select({ ios: menuIconColor }),
+  };
 
   const layoutActions: MenuAction[] = [
     {
       id: "layout",
-      title: "Layout",
+      title: t("bookmarks.layout_menu"),
       image: Platform.select({ ios: "rectangle.grid.1x2" }),
       imageColor: Platform.select({ ios: menuIconColor }),
-      subactions: [
-        {
-          id: "card",
-          title: "Card",
-          state: settings.bookmarkLayout === "card" ? "on" : "off",
-          image: Platform.select({ ios: "rectangle.grid.1x2" }),
-          imageColor: Platform.select({ ios: menuIconColor }),
-        },
-        {
-          id: "list",
-          title: "List",
-          state: settings.bookmarkLayout === "list" ? "on" : "off",
-          image: Platform.select({ ios: "list.bullet" }),
-          imageColor: Platform.select({ ios: menuIconColor }),
-        },
-      ],
+      subactions: layoutModeActions,
     },
+    showNotesAction,
     {
       id: "sort",
-      title: "Sort",
+      title: t("bookmarks.sort_menu"),
       image: Platform.select({ ios: "arrow.up.arrow.down" }),
       imageColor: Platform.select({ ios: menuIconColor }),
       subactions: [
         {
           id: "sort_desc",
-          title: "Newest First",
+          title: t("bookmarks.sort_newest"),
           state: settings.bookmarkSortOrder === "desc" ? "on" : "off",
           image: Platform.select({ ios: "arrow.down" }),
           imageColor: Platform.select({ ios: menuIconColor }),
         },
         {
           id: "sort_asc",
-          title: "Oldest First",
+          title: t("bookmarks.sort_oldest"),
           state: settings.bookmarkSortOrder === "asc" ? "on" : "off",
           image: Platform.select({ ios: "arrow.up" }),
           imageColor: Platform.select({ ios: menuIconColor }),
@@ -65,6 +79,14 @@ function useBookmarkListLayoutMenu(): {
       setSettings({
         ...settings,
         bookmarkLayout: event,
+      });
+      return true;
+    }
+
+    if (event === "show_notes") {
+      setSettings({
+        ...settings,
+        showNotes: !settings.showNotes,
       });
       return true;
     }
@@ -84,8 +106,9 @@ function useBookmarkListLayoutMenu(): {
 }
 
 export default function BookmarkListHeader() {
-  const { layoutActions, handleLayoutAction, menuIconColor } =
-    useBookmarkListLayoutMenu();
+  const { layoutActions, handleLayoutAction } = useBookmarkListLayoutMenu();
+  const { colors } = useColorScheme();
+  const { t } = useTranslation();
 
   return (
     <MenuView
@@ -95,8 +118,13 @@ export default function BookmarkListHeader() {
       actions={layoutActions}
       shouldOpenOnLongPress={false}
     >
-      <View className="h-9 w-9 items-center justify-center rounded-full bg-card">
-        <MoreHorizontal size={20} color={menuIconColor} />
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={t("bookmarks.view_options")}
+        className="h-9 w-9 items-center justify-center"
+      >
+        <AppIcon icon={SlidersHorizontal} size={19} color={colors.foreground} />
       </View>
     </MenuView>
   );

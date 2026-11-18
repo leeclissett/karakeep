@@ -7,6 +7,33 @@ packages:
 
 nodeLinker: hoisted
 
+# Refuse to install a version whose publish trust (trusted publisher or
+# provenance) is weaker than an earlier version of the same package, which is
+# what a takeover with a stolen publish token looks like.
+trustPolicy: no-downgrade
+# Exact versions only, so later releases of these packages are still checked.
+# Each was hand-published by the package's long-time maintainer (without CI
+# provenance) after other releases had started shipping with it. Review the
+# publisher and release history on npm before adding an entry here.
+trustPolicyExclude:
+  # paulmillr, after 3.6.0 shipped with provenance.
+  - chokidar@4.0.3
+  # lukastaegert, a 2.x backport after 4.x moved to trusted publishing.
+  - rollup@2.80.0
+  # lukekarrys (npm team), a 6.x backport after 7.5.1 shipped with provenance.
+  - semver@6.3.1
+  # faisalman (the author), 1.x maintenance after 2.0 prereleases had provenance.
+  - ua-parser-js@1.0.41
+# Only direct dependencies may come from git repos or tarball URLs. This is
+# already pnpm 11's default; it's set explicitly so a future default change
+# can't silently turn it off.
+blockExoticSubdeps: true
+
+# pdfjs-dist only needs its native canvas to render pages; the workers use it to
+# extract text.
+ignoredOptionalDependencies:
+  - "@napi-rs/canvas"
+
 allowBuilds:
   "@sentry/cli": true
   "@swc/core": true
@@ -24,49 +51,119 @@ allowBuilds:
 
 patchedDependencies:
   react-tweet@3.2.2: "patches/react-tweet@3.2.2.patch"
-  xcode@3.0.1: "patches/xcode@3.0.1.patch"
-  playwright-extra@4.3.6: "patches/playwright-extra@4.3.6.patch"
-  # Swift 6.2 / Xcode 26 rejects `weak let`; rewrite to `nonisolated(unsafe) weak var`.
-  expo-modules-jsi@56.0.12: patches/expo-modules-jsi@56.0.12.patch
-  # RN 0.85's Appearance.setColorScheme is non-null; pass "unspecified" (not null) for system theme.
-  react-native-css-interop@0.2.1: patches/react-native-css-interop@0.2.1.patch
-  # Disables React 19.2's dev "component performance track" prop serialization,
-  # which crashes when a changed prop is a tRPC proxy (RN 0.85 + new arch).
-  react-native@0.85.3: patches/react-native@0.85.3.patch
+  # Disables React 19's dev "component performance track" prop serialization,
+  # which crashes when a changed prop is a tRPC proxy (RN 0.88 + new arch).
+  react-native@0.88.1: patches/react-native@0.88.1.patch
+  # Android: don't drop shares that arrive while the app is being recreated after
+  # process death, and don't replay the task's launch share on reopen (#513).
+  # JS: don't truncate shared URLs at parentheses and other valid URL chars (#2219).
+  expo-share-intent@9.0.0: patches/expo-share-intent@9.0.0.patch
+  # Detach service worker targets that Chrome reports without a browserContextId
+  # instead of failing an assertion that crashes connectOverCDP().
+  patchright-core@1.59.4: patches/patchright-core@1.59.4.patch
+  # React Native's prebuilt core (Expo SDK 58) only exposes <React/...> headers,
+  # so the quoted "RCTBridge.h" import no longer resolves.
+  "@react-native-menu/menu@2.0.0": patches/@react-native-menu__menu@2.0.0.patch
+  # Android Gradle Plugin 9 (Expo SDK 58) rejects proguard-android.txt. Fixed
+  # upstream in 0.24.12; drop this when upgrading.
+  react-native-blob-util@0.21.2: patches/react-native-blob-util@0.21.2.patch
 
 # Docker builds can prune packages that use one of the root patches.
 allowUnusedPatches: true
 
-minimumReleaseAgeExclude:
-  [
-    "@next/bundle-analyzer@16.3.3",
-    "@next/env@16.3.3",
-    "@next/swc-darwin-arm64@16.3.3",
-    "@next/swc-darwin-x64@16.3.3",
-    "@next/swc-linux-arm64-gnu@16.3.3",
-    "@next/swc-linux-arm64-musl@16.3.3",
-    "@next/swc-linux-x64-gnu@16.3.3",
-    "@next/swc-linux-x64-musl@16.3.3",
-    "@next/swc-win32-arm64-msvc@16.3.3",
-    "@next/swc-win32-x64-msvc@16.3.3",
-    next@16.3.3,
+minimumReleaseAgeExclude: [
+    "@next/bundle-analyzer@16.4.1",
+    "@next/env@16.4.1",
+    "@next/swc-darwin-arm64@16.4.1",
+    "@next/swc-darwin-x64@16.4.1",
+    "@next/swc-linux-arm64-gnu@16.4.1",
+    "@next/swc-linux-arm64-musl@16.4.1",
+    "@next/swc-linux-x64-gnu@16.4.1",
+    "@next/swc-linux-x64-musl@16.4.1",
+    "@next/swc-win32-arm64-msvc@16.4.1",
+    "@next/swc-win32-x64-msvc@16.4.1",
+    next@16.4.1,
+    liteque@0.10.0,
+    "@astrojs/react@6.0.6",
+    # Better Auth's Nov 3, 2026 security release.
+    "@better-auth/core@1.7.16",
+    "@better-auth/drizzle-adapter@1.7.16",
+    "@better-auth/kysely-adapter@1.7.16",
+    "@better-auth/memory-adapter@1.7.16",
+    "@better-auth/mongo-adapter@1.7.16",
+    "@better-auth/prisma-adapter@1.7.16",
+    "@better-auth/telemetry@1.7.16",
+    better-auth@1.7.16,
+    better-call@1.4.5,
+    # Fork: Next.js Nov 3, 2026 security release.
+    "@next/bundle-analyzer@16.4.5",
+    "@next/env@16.4.5",
+    "@next/swc-darwin-arm64@16.4.5",
+    "@next/swc-darwin-x64@16.4.5",
+    "@next/swc-linux-arm64-gnu@16.4.5",
+    "@next/swc-linux-arm64-musl@16.4.5",
+    "@next/swc-linux-x64-gnu@16.4.5",
+    "@next/swc-linux-x64-musl@16.4.5",
+    "@next/swc-win32-arm64-msvc@16.4.5",
+    "@next/swc-win32-x64-msvc@16.4.5",
+    next@16.4.5,
   ]
 
-# Pin vite so adding vitest as a direct devDep to apps/mcp doesn't hoist
-# vite 7.3.x, which surfaces a nested-vite peer mismatch inside
-# apps/browser-extension via @vitejs/plugin-react-swc. Both 7.0.6 and
-# 7.3.x were already in the lockfile before this PR; this just makes
-# 7.0.6 the workspace-wide resolution.
 overrides:
+  # 6.1.3's CVE fix breaks Tailwind 3's `:merge(.group)` variant transform.
+  "tailwindcss@3.4.1>postcss-selector-parser": 6.1.4
+  # OpenAPI's Postman converter pins both YAML parsers to vulnerable releases.
+  "openapi-to-postmanv2@6>js-yaml": 4.3.2
+  "openapi-to-postmanv2@6>yaml": 1.10.3
+  # The current OpenTelemetry exporters pin older 2.x core versions exactly.
+  "@opentelemetry/core@>=2.0.0 <2.8.0": 2.8.0
+  # refractor 3 restricts prismjs to ~1.27.0.
+  "refractor@3>prismjs": 1.30.0
+  # Docusaurus's webpack plugins require v6. v7 keeps the API and needs Node 20+.
+  "serialize-javascript@>=6.0.0 <7.0.5": 7.0.5
   i18next-fs-backend: 2.6.6
-  shell-quote: 1.8.4
-  vite: 7.0.6
+  shell-quote: 1.11.0
   # React Native vendors a renderer built against one exact React version and
   # asserts on it at runtime, so the whole workspace has to agree. React's
   # experimental types also contain unique symbols, so separate @types/react
   # versions are not structurally compatible. Keep these in sync with the
   # versions used by the apps when bumping Expo or React.
-  react: 19.2.3
-  react-dom: 19.2.3
-  "@types/react": 19.2.15
-  "@types/react-dom": 19.2.3
+  react: 19.3.0
+  react-dom: 19.3.0
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  # Fork: transitive security fixes not yet picked up upstream (Nov 2026).
+  # One entry per undici major in the tree, so no parent is moved across a
+  # major. 6.x: @sentry/cli, @apidevtools/json-schema-ref-parser,
+  # @karakeep/shared; 7.x: cheerio; 8.x: jsdom, node-gyp, unifont.
+  # GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26, GHSA-qrxm-fqhp-jwvm,
+  # GHSA-xjj6-f33q-929c.
+  "undici@6": ^6.29.1
+  "undici@7": ^7.30.2
+  "undici@8": ^8.12.4
+  # Expo CLI / code signing. GHSA-5x38-2vff-x55p, GHSA-jc66-7q78-782g.
+  "node-forge@1": ^1.4.1
+  # http-proxy. GHSA-8r9p-f939-6h3c.
+  "follow-redirects@1": ^1.16.2
+  # express 4 asks for ~1.20.5. GHSA-27r3-jxmh-p828.
+  "body-parser@1": ~1.20.9
+  # Fork: in-major fixes for other high findings from `pnpm audit` (Nov 2026).
+  # zod 4.x is used by web, workers and every server package.
+  # GHSA-mrhx-c7xc-m3w5.
+  "zod@4": ^4.6.6
+  # Dev/build only (vitest and the vite-built apps). GHSA-587h-7wmj-h5pm.
+  "vite@8": ^8.3.3
+  # apps/mcp. GHSA-jm63-cq47-j5jp, GHSA-46jr-4wx8-v453, GHSA-f897-62hf-6gxq.
+  "@modelcontextprotocol/server@2": ^2.3.0
+  # Docs only (Docusaurus). GHSA-4528-x5fx-h6hg, GHSA-587h-7wmj-h5pm.
+  "joi@17": ^17.13.9
+  "launch-editor@2": ^2.14.2
+  # Docusaurus asks for tinypool ^1 and every 1.x is affected (no 1.x fix).
+  # Its SSG executor only uses options that 2.x keeps unchanged, and 2.x is
+  # already in the tree via vitest. GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr.
+  "tinypool@1": ^2.2.0
+  # Moderate, but in the shipped server: hono (web/api) GHSA-5r4p-p66f-jhc7;
+  # nodemailer (trpc email) GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w,
+  # GHSA-85x2-q946-cp5h.
+  "hono@4": ^4.13.11
+  "nodemailer@10": ^10.1.4

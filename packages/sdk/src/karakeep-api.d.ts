@@ -291,7 +291,7 @@ export interface paths {
     head?: never;
     /**
      * Update a list
-     * @description Partially update a list. List metadata can only be changed by its owner; any user with access can change their own pinned preference.
+     * @description Partially update a list. Only the fields provided in the request body will be updated.
      */
     patch: operations["updateList"];
     trace?: never;
@@ -941,6 +941,7 @@ export interface components {
           | "avatar"
           | "unknown";
         fileName?: string | null;
+        size?: number | null;
       }[];
     };
     /** @description Cursor from a previous response to fetch the next page. */
@@ -986,8 +987,6 @@ export interface components {
       type: "manual" | "smart";
       query?: string | null;
       public: boolean;
-      /** @description Whether the list is pinned for the current user. */
-      pinned: boolean;
       hasCollaborators: boolean;
       /** @enum {string} */
       userRole: "owner" | "editor" | "viewer" | "public";
@@ -1002,6 +1001,8 @@ export interface components {
        */
       color: "yellow" | "red" | "green" | "blue";
       text: string | null;
+      prefix: string | null;
+      suffix: string | null;
       note: string | null;
       id: string;
       userId: string;
@@ -1018,9 +1019,31 @@ export interface components {
       };
     };
     PaginatedHighlights: {
-      highlights: components["schemas"]["Highlight"][];
+      highlights: components["schemas"]["HighlightWithBookmark"][];
       /** @description Cursor for the next page, or null if no more results. */
       nextCursor: string | null;
+    };
+    HighlightWithBookmark: {
+      bookmarkId: string;
+      startOffset: number;
+      endOffset: number;
+      /**
+       * @default yellow
+       * @enum {string}
+       */
+      color: "yellow" | "red" | "green" | "blue";
+      text: string | null;
+      prefix: string | null;
+      suffix: string | null;
+      note: string | null;
+      id: string;
+      userId: string;
+      /** Format: date-time */
+      createdAt: string;
+      bookmark: {
+        title: string | null;
+        url: string | null;
+      };
     };
     UploadedAsset: {
       /** @description The unique identifier assigned to the uploaded asset. */
@@ -1884,6 +1907,7 @@ export interface operations {
               | "avatar"
               | "unknown";
             fileName?: string | null;
+            size?: number | null;
           };
         };
       };
@@ -2049,8 +2073,6 @@ export interface operations {
           type?: "manual" | "smart";
           query?: string;
           parentId?: string | null;
-          /** @description Whether the list should be pinned for the current user. */
-          pinned?: boolean;
         };
       };
     };
@@ -2174,7 +2196,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    /** @description The fields to update. The pinned field applies only to the authenticated user. */
+    /** @description The fields to update. Only the fields you want to change need to be provided. */
     requestBody?: {
       content: {
         "application/json": {
@@ -2184,8 +2206,6 @@ export interface operations {
           parentId?: string | null;
           query?: string;
           public?: boolean;
-          /** @description Whether the list is pinned for the current user. */
-          pinned?: boolean;
         };
       };
     };
@@ -2673,6 +2693,8 @@ export interface operations {
            */
           color?: "yellow" | "red" | "green" | "blue";
           text: string | null;
+          prefix?: string | null;
+          suffix?: string | null;
           note: string | null;
         };
       };

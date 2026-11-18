@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockClient, mockTool } = vi.hoisted(() => ({
@@ -14,7 +14,7 @@ const { mockClient, mockTool } = vi.hoisted(() => ({
 
 vi.mock("./shared", () => ({
   karakeepClient: mockClient,
-  mcpServer: { tool: mockTool },
+  registerTool: mockTool,
 }));
 
 import {
@@ -41,7 +41,6 @@ const sampleList = {
   parentId: null,
   query: null,
   public: false,
-  pinned: false,
   hasCollaborators: false,
   userRole: "owner" as const,
 };
@@ -99,7 +98,6 @@ describe("get-list", () => {
     expect(text).toContain("Name: Reading");
     expect(text).toContain("Type: manual");
     expect(text).toContain("Public: false");
-    expect(text).toContain("Pinned: false");
   });
 
   it("returns an MCP error when the list is not found", async () => {
